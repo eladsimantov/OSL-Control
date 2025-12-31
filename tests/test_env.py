@@ -10,5 +10,5 @@ if __name__ == "__main__":
     # print(os.getcwd())
     import opensourceleg as osl
     from opensourceleg.actuators import ActuatorBase
-    from src.drivers.odrive_can import ODriveCAN, ODriveMotor
+    from src.drivers.odrive_can import *
     print("Environment is set up.")
