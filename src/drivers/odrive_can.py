@@ -7,55 +7,66 @@ import os
 # CAN Initialization (Linux/Raspberry Pi)
 # os.system("sudo ip link set can0 up type can bitrate 250000")
 
+# ===========================================================
+# CLASS: ODriveCAN
+# - background listener decodes incoming CAN frames and stores
+#   the latest decoded signals per (axis, message_name).
+# ===========================================================
 class ODriveCAN:
-    def __init__(self, bus_name="can0", node_id=1, dbc_path="odrive-cansimple.dbc"):
+    def __init__(self, bus_name="can0", node_id=1, dbc_path=os.path.join(os.getcwd(), "src/drives/odrive-cansimple.dbc")):
         self.node_id = node_id
         self.axisID = node_id
-        # Open CAN and DBC
+        # open CAN and DBC
         self.bus = can.Bus(bus_name, bustype="socketcan")
         try:
             self.db = cantools.database.load_file(dbc_path)
         except Exception:
-            print(f"Error: Could not find DBC file at {dbc_path}")
             self.db = None
-            
         self.latest = {}  # {(axis, message_name): signals_dict}
-        self.running = True
         self._listener_thread = threading.Thread(target=self._listener, daemon=True)
         self._listener_thread.start()
 
-    def send_dbc(self, message_name, signals):
-        if not self.db: return
+    def send(self, arb_id, data):
+        if not isinstance(data, (bytes, bytearray)):
+            data = bytes(data)
+        msg = can.Message(arbitration_id=arb_id, is_extended_id=False, data=data)
         try:
-            data = self.db.encode_message(message_name, signals)
-            message = self.db.get_message_by_name(message_name)
-            arb_id = (self.axisID << 5) | message.frame_id
-            msg = can.Message(arbitration_id=arb_id, is_extended_id=False, data=data)
             self.bus.send(msg)
-        except Exception as e:
-            print(f"CAN Send Error: {e}")
+        except Exception:
+            pass
+
+    def send_dbc(self, message_name, signals):
+        if not self.db:
+            raise RuntimeError("DBC not loaded")
+        data = self.db.encode_message(message_name, signals)
+        message = self.db.get_message_by_name(message_name)
+        arb_id = (self.axisID << 5) | message.frame_id
+        self.send(arb_id, data)
 
     def _listener(self):
-        while self.running:
+        while True:
             try:
                 msg = self.bus.recv(timeout=1.0)
-                if not msg: continue
-                
+                if not msg:
+                    continue
                 frame_id = msg.arbitration_id & 0x1F
                 axis = msg.arbitration_id >> 5
-                
                 if not self.db:
                     self.latest[(axis, f"RAW_{frame_id:#x}")] = {"raw": msg.data}
                     continue
-                
                 try:
                     message = self.db.get_message_by_frame_id(frame_id)
-                    signals = message.decode(msg.data)
-                    self.latest[(axis, message.name)] = signals
                 except Exception:
-                    pass # Message not in DBC or decode error
+                    self.latest[(axis, f"RAW_{frame_id:#x}")] = {"raw": msg.data}
+                    continue
+                try:
+                    signals = message.decode(msg.data)
+                except Exception:
+                    self.latest[(axis, message.name)] = {"raw": msg.data}
+                    continue
+                self.latest[(axis, message.name)] = signals
             except Exception:
-                pass
+                time.sleep(0.1)
 
     def get_latest_for_axis(self, axis):
         out = {}
@@ -72,10 +83,19 @@ class ODriveCAN:
                     if sname.lower() == cand.lower():
                         return (mname, sname, val)
         return (None, None, None)
-    
-    def shutdown(self):
-        self.running = False
-        self.bus.shutdown()
+
+    def dump_axis(self, axis):
+        msgs = self.get_latest_for_axis(axis)
+        if not msgs:
+            return f"axis {axis}: no decoded messages"
+        out = [f"axis {axis}:"]
+        for mname, signals in msgs.items():
+            out.append(f"  {mname}:")
+            for sname, val in signals.items():
+                out.append(f"    {sname} = {val}")
+        return "\n".join(out)
+
+
 
 
 class ODriveMotor:
