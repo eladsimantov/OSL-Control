@@ -16,6 +16,9 @@ os.system("sudo ip link set can0 up type can bitrate 250000")
 # - background listener decodes incoming CAN frames and stores
 #   the latest decoded signals per (axis, message_name).
 # ===========================================================
+
+# MAKE SURE YOU CHANGE dbc_path ACCORDING TO THE MACHINE YOU'RE WORKING ON
+
 class ODriveCAN:
     def __init__(self, bus_name="can0", node_id=1, dbc_path="/home/enable-lab/Downloads/odrive-cansimple.dbc"):
         self.node_id = node_id
