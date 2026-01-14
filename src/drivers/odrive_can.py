@@ -101,7 +101,7 @@ class ODriveCAN:
 # CLASS: ODriveMotor (Single Motor)
 # ===========================================================
 class ODriveMotor:
-    def __init__(self, can_interface: ODriveCAN, gear_ratio=20, name="motor"):
+    def __init__(self, can_interface: ODriveCAN, gear_ratio=40, name="motor"):
         self.can = can_interface
         self.gear_ratio = gear_ratio
         self.name = name
@@ -185,6 +185,19 @@ class ODriveMotor:
             })
         except Exception:
             self.alive = False
+   #this function doesnt work well 
+    def torque_nm(self,torque):
+        if not self.alive:
+            return
+        try:
+            self.can.send_dbc("Axis0_Set_Input_Torque", {
+                "Input_Torque": float(torque)
+            })
+            print(f"torque_nm command: {torque} Nm")
+        except Exception:
+            self.alive = False
+
+
 
     def encoder_reset(self):
         if not self.alive:
@@ -201,6 +214,8 @@ class ODriveMotor:
         print(f"→ {self.name}: STARTING FULL CALIBRATION (approx {int(wait_time)}s)")
         try:
             self.set_state(3)
+
+            #state 3 is full calibration sequence
             start = time.time()
             while time.time() - start < wait_time:
                 remaining = int(wait_time - (time.time() - start))
@@ -208,8 +223,10 @@ class ODriveMotor:
                 time.sleep(0.5)
             print(" " * 60, end="\r")
             self.set_state(1)
+            #state 1 is idle 
             time.sleep(0.8)
             self.set_state(8)
+            #state 8 is closed loop control
             time.sleep(0.2)
             mname, sname, val = self.can.find_signal(self.can.axisID, ["pos_estimate", "pos", "encoder_pos", "encoder_count", "position"])
             if val is not None:
@@ -221,6 +238,13 @@ class ODriveMotor:
                         turns = v
                     self._home_deg = turns * 360.0 / self.gear_ratio
                     print(f"→ {self.name}: Set home baseline from {mname}.{sname} = {val} -> home_deg={self._home_deg:.2f}")
+                    
+                    #a try to solve the jumping problem
+                    self.set_state(1)
+                    self.position_deg(self._home_deg)
+                    time.sleep(1)
+                    self.set_state(8)
+                    time.sleep(0.2)
                 except Exception:
                     self._home_deg = 0.0
             else:
@@ -229,6 +253,7 @@ class ODriveMotor:
         except Exception:
             self.alive = False
             print(f"→ {self.name}: CALIBRATION FAILED")
+       
 
     def save_config(self):
         if not self.alive:
