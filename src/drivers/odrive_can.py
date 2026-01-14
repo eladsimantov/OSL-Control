@@ -12,8 +12,9 @@ import os
 # - background listener decodes incoming CAN frames and stores
 #   the latest decoded signals per (axis, message_name).
 # ===========================================================
+
 class ODriveCAN:
-    def __init__(self, bus_name="can0", node_id=1, dbc_path=os.path.join(os.getcwd(), "src/drives/odrive-cansimple.dbc")):
+    def __init__(self, bus_name="can0", node_id=1, dbc_path="/home/enable-lab/OSL-Control/src/drivers/odrive-cansimple.dbc"):
         self.node_id = node_id
         self.axisID = node_id
         # open CAN and DBC
@@ -96,8 +97,9 @@ class ODriveCAN:
         return "\n".join(out)
 
 
-
-
+# ===========================================================
+# CLASS: ODriveMotor (Single Motor)
+# ===========================================================
 class ODriveMotor:
     def __init__(self, can_interface: ODriveCAN, gear_ratio=20, name="motor"):
         self.can = can_interface
@@ -107,44 +109,170 @@ class ODriveMotor:
         self._home_deg = 0.0
 
     def set_state(self, state_id):
-        # 8 = Closed Loop, 1 = Idle
-        self.can.send_dbc("Axis0_Set_Axis_State", {"Axis_Requested_State": state_id})
+        try:
+            self.can.send_dbc("Axis0_Set_Axis_State", {"Axis_Requested_State": state_id})
+        except Exception:
+            self.alive = False
 
-    def get_position_deg(self):
-        """Returns position in degrees relative to home."""
+    def closed_loop(self):
+        print(f"→ {self.name}: CLOSED_LOOP_CONTROL")
+        self.set_state(8)
+
+    def idle(self):
+        print(f"→ {self.name}: IDLE")
+        self.set_state(1)
+
+    def _read_current_turns(self):
         candidates = ["pos_estimate", "pos", "encoder_pos", "encoder_count", "position"]
         mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-        
-        if val is None: return 0.0
-        
+        if val is None:
+            return None, None, None
         try:
             v = float(val)
-            # Logic from your original code regarding counts vs turns
-            if abs(v) > 1000: turns = v / 4096.0
-            else: turns = v
-            
-            deg = (turns * 360.0 / self.gear_ratio) - self._home_deg
-            return deg
-        except:
-            return 0.0
+        except Exception:
+            return mname, sname, None
+        if abs(v) > 1000:
+            turns = v / 4096.0
+            return mname, sname, turns
+        else:
+            return mname, sname, v
 
-    def set_position_deg(self, deg):
-        """Send Position Command."""
-        target_deg = deg + self._home_deg
-        target_turns = (target_deg / 360.0) * self.gear_ratio
-        
-        self.can.send_dbc("Axis0_Set_Input_Pos", {
-            "Input_Pos": float(target_turns),
-            "Vel_FF": 0.0,
-            "Torque_FF": 0.0
-        })
+    def position_deg(self, deg, absolute=True):
+        """Command position in degrees.
 
-    def set_torque(self, torque_nm):
-        """Send Torque Command (Added for OSL Compatibility)."""
-        # Note: ODrive typically expects torque at the motor shaft.
-        # If your gear ratio is 20, 1Nm at output = 0.05Nm at motor.
-        motor_torque = torque_nm / self.gear_ratio 
-        
-        self.can.send_dbc("Axis0_Set_Input_Torque", {
-            "Input_Torque": float(motor_torque)
-        })
+        If absolute==False (default) deg is treated as a relative delta (old behavior).
+        If absolute==True deg is treated as an absolute output angle (degrees)
+        relative to stored home baseline (_home_deg).
+        """
+        if not self.alive:
+            return
+
+        if absolute:
+            # absolute target in output degrees -> convert to motor turns
+            target_deg = deg + self._home_deg
+            target_turns = (target_deg / 360.0) * self.gear_ratio
+            debug_src = "absolute"
+        else:
+            # relative: compute delta in motor turns and add to current reading or home baseline
+            delta_turns = (deg / 360.0) * self.gear_ratio
+            mname, sname, cur_turns = self._read_current_turns()
+            if cur_turns is None:
+                home_turns = (self._home_deg / 360.0) * self.gear_ratio
+                target_turns = home_turns + delta_turns
+                debug_src = "home_baseline"
+            else:
+                target_turns = cur_turns + delta_turns
+                debug_src = f"{mname}.{sname}"
+
+        try:
+            self.can.send_dbc("Axis0_Set_Input_Pos", {
+                "Input_Pos": float(target_turns),
+                "Vel_FF": 30.0,
+                "Torque_FF": 1.0
+            })
+            print(f"{self.name} -> pos cmd: target_turns={target_turns:.6f} (src={debug_src})")
+        except Exception:
+            self.alive = False
+
+    def velocity_deg_s(self, vel):
+        if not self.alive:
+            return
+        turns_s = (vel / 360.0) * self.gear_ratio
+        try:
+            self.can.send_dbc("Axis0_Set_Input_Vel", {
+                "Input_Vel": turns_s,
+                "Input_Torque_FF": 1.0
+            })
+        except Exception:
+            self.alive = False
+
+    def encoder_reset(self):
+        if not self.alive:
+            return
+        try:
+            self.can.send_dbc("Axis0_Set_Encoder_Pos", {"Encoder_Pos": 0.0})
+        except Exception:
+            self.alive = False
+
+    def calibrate(self, wait_time=18.0):
+        if not self.alive:
+            print(f"→ {self.name}: not available for calibration")
+            return
+        print(f"→ {self.name}: STARTING FULL CALIBRATION (approx {int(wait_time)}s)")
+        try:
+            self.set_state(3)
+            start = time.time()
+            while time.time() - start < wait_time:
+                remaining = int(wait_time - (time.time() - start))
+                print(f"  calibrating... {remaining:2d}s remaining", end="\r")
+                time.sleep(0.5)
+            print(" " * 60, end="\r")
+            self.set_state(1)
+            time.sleep(0.8)
+            self.set_state(8)
+            time.sleep(0.2)
+            mname, sname, val = self.can.find_signal(self.can.axisID, ["pos_estimate", "pos", "encoder_pos", "encoder_count", "position"])
+            if val is not None:
+                try:
+                    v = float(val)
+                    if abs(v) > 1000:
+                        turns = v / 4096.0
+                    else:
+                        turns = v
+                    self._home_deg = turns * 360.0 / self.gear_ratio
+                    print(f"→ {self.name}: Set home baseline from {mname}.{sname} = {val} -> home_deg={self._home_deg:.2f}")
+                except Exception:
+                    self._home_deg = 0.0
+            else:
+                print(f"→ {self.name}: No encoder message seen yet; home baseline left at {self._home_deg:.2f} deg")
+            print(f"→ {self.name}: CALIBRATION COMPLETE (approx)")
+        except Exception:
+            self.alive = False
+            print(f"→ {self.name}: CALIBRATION FAILED")
+
+    def save_config(self):
+        if not self.alive:
+            print(f"→ {self.name}: not available to save config")
+            return
+        try:
+            arb = (self.can.axisID << 5) | 0x001
+            self.can.send(arb, [0] * 8)
+            print(f"→ {self.name}: SAVE CONFIG SENT")
+        except Exception:
+            self.alive = False
+            print(f"→ {self.name}: SAVE CONFIG FAILED")
+
+    def save_calibration_params(self):
+        self.save_config()
+
+    def reboot(self):
+        if not self.alive:
+            return
+        try:
+            self.can.send((self.can.axisID << 5) | 0x016, [0] * 8)
+        except Exception:
+            self.alive = False
+
+    def print_encoder_position(self):
+        try:
+            candidates = ["pos_estimate", "pos", "encoder_pos", "encoder_count", "position"]
+            mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+            if val is not None:
+                try:
+                    v = float(val)
+                    if abs(v) > 1000:
+                        turns = v / 4096.0
+                        note = "counts->turns(4096)"
+                    else:
+                        turns = v
+                        note = "turns"
+                    deg = turns * 360.0 / self.gear_ratio
+                    print(f"{self.name} [{mname}.{sname}] raw={v} ({note}) -> {deg:.2f} deg (home {self._home_deg:.2f})")
+                except Exception:
+                    print(f"{self.name} [{mname}.{sname}] = {val}")
+            else:
+                dump = self.can.dump_axis(self.can.axisID)
+                print(f"{self.name} encoder: no matched signal. Dump:\n{dump}")
+        except Exception as e:
+            print(f"{self.name} encoder: Error reading position ({e})")
+

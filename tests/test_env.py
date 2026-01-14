@@ -11,4 +11,7 @@ if __name__ == "__main__":
     import opensourceleg as osl
     from opensourceleg.actuators import ActuatorBase
     from src.drivers.odrive_can import *
+    dbc_path = "/home/enable-lab/OSL-Control/src/drivers/odrive-cansimple.dbc"
+    db = cantools.database.load_file(dbc_path)
+    # db.encode_message("", 0)
     print("Environment is set up.")
