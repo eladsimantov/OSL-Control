@@ -107,7 +107,7 @@ class ODriveCAN:
 # CLASS: ODriveMotor (Single Motor)
 # ===========================================================
 class ODriveMotor:
-    def __init__(self, can_interface: ODriveCAN, gear_ratio=20, name="motor"):
+    def __init__(self, can_interface: ODriveCAN, gear_ratio=40, name="motor"):
         self.can = can_interface
         self.gear_ratio = gear_ratio
         self.name = name
