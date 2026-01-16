@@ -28,3 +28,17 @@ cal2 <s>       - calibrate ankle (optional seconds)
 save1          - save knee calibration params
 save2          - save ankle calibration params
 x              - exit
+
+
+
+# Cascade control architecture for Odrive motors 
+https://docs.odriverobotics.com/v/latest/manual/control.html
+
+the torque is in N-m
+
+
+
+# updates
+important basic functions:
+1. set state - idle,closed loop, calibration 
+2. control mode - for changing between torque,position and velocity
