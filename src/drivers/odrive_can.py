@@ -122,6 +122,31 @@ class ODriveMotor:
         print(f"→ {self.name}: IDLE")
         self.set_state(1)
 
+    def control_mode(self,mode_id,input_id):
+        try:
+            self.can.send_dbc("Axis0_Set_Controller_Mode", {
+                "Input_Mode":input_id,
+                "Control_Mode": mode_id})
+            
+            #input mode means we can use ramp or trajectory, all the options are in the dbc 
+            #control mode is the mode itself. 
+            #input mode is neccesary for the control mode to work.
+            #input mode 1 is without filtering 
+        except Exception:
+            self.alive = False
+
+    def torque_control(self):   
+        print(f"→ {self.name}: TORQUE_CONTROL")
+        self.control_mode(1,1)
+
+    def velocity_control(self):
+        print(f"→ {self.name}: VELOCITY_CONTROL")
+        self.control_mode(2,1)
+        
+    def position_control(self):  
+        print(f"→ {self.name}: POSITION_CONTROL")
+        self.control_mode(3,1)
+
     def _read_current_turns(self):
         candidates = ["pos_estimate", "pos", "encoder_pos", "encoder_count", "position"]
         mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
@@ -136,6 +161,44 @@ class ODriveMotor:
             return mname, sname, turns
         else:
             return mname, sname, v
+
+    def read_current_deg(self):
+        mname,sname,turns =self._read_current_turns()
+        if turns is not None:
+            self.degrees = 360* (turns / self.gear_ratio)
+            print (self.degrees)
+        
+    def follow_position(self,stop_time=30):
+        self.start_time = time.time()
+        self.current_time = 0
+        
+        while self.current_time-self.start_time <stop_time:
+            self.current_time = time.time()
+            self.read_current_deg()
+            time.sleep(0.1)
+    
+    #current reading is not working right now
+    # def read_current_current(self):
+    #     candidates = ["iq_measured", "motor_current", "current"]
+    #     mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+    #     if val is None:
+    #         return None, None, None
+    #     try:
+    #         v = float(val)
+    #         return mname, sname, v
+    #     except Exception:
+    #         return mname, sname, None
+        
+    # def follow_current(self,stop_time=30):
+    #     self.start_time = time.time()
+    #     self.current_time = 0
+        
+    #     while self.current_time-self.start_time <stop_time:
+    #         self.current_time = time.time()
+    #         mname,sname,current = self.read_current_current()
+    #         if current is not None:
+    #             print (f"Current reading: {current} A")
+    #         time.sleep(0.1)
 
     def position_deg(self, deg, absolute=True):
         """Command position in degrees.
@@ -185,8 +248,9 @@ class ODriveMotor:
             })
         except Exception:
             self.alive = False
-   #this function doesnt work well 
+  
     def torque_nm(self,torque):
+        self.torque_control()
         if not self.alive:
             return
         try:
@@ -196,6 +260,25 @@ class ODriveMotor:
             print(f"torque_nm command: {torque} Nm")
         except Exception:
             self.alive = False
+
+    #this function cant work without torque measurments
+    # def impedance_control(self, kp=0, kd=0, pos_eq_deg=0.0):
+    #     self.turns = self._read_current_turns()
+        
+    #     #printing: 
+
+    #     if not self.alive:
+    #         return
+    #     try:
+    #         self.can.send_dbc("Axis0_Set_Impedance_Control", {
+    #             "Input_Pos": float(pos_turns),
+    #             "Input_Vel": float(vel_turns_s),
+    #             "Kp": float(kp),
+    #             "Kd": float(kd)
+    #         })
+    #         print(f"{self.name} -> impedance cmd: pos_turns={pos_turns:.6f}, vel_turns_s={vel_turns_s:.6f}, Kp={kp}, Kd={kd}")
+    #     except Exception:
+    #         self.alive = False
 
 
 

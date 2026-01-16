@@ -21,7 +21,7 @@ sys.path.insert(0, project_path)
 from src.drivers.odrive_can import ODriveMotor
 from src.drivers.odrive_can import ODriveCAN
 
-os.system("sudo ip link set can0 up type can bitrate 250000")
+# os.system("sudo ip link set can0 up type can bitrate 250000")
 
 #probably we need the second class also, maybe even the third 
 #we want to move to one command for initiation, not 2 or more 
@@ -53,42 +53,56 @@ def main():
 
 #if we use sleep,the leg need time to reach the position. the code runs before it.
 
-    #first movement
-    knee.position_deg(0)
-    time.sleep(10)
-    #oriention 
-    degKnee = 10
-    #need to check for float or integar 
-    knee.position_deg(degKnee)
-    degAnkle = 10 
-    ankle.position_deg(degAnkle)
-    delay = 3 # seconds
-    time.sleep(delay)
-    knee.position_deg(90)
-    time.sleep(30)
-    degKnee = 0
-    knee.position_deg(degKnee)
-    time.sleep(30)
-    degAnkle = 0
-    ankle.position_deg(degAnkle)
-    time.sleep(delay)
-
+    #sensing:
     #trajectory
+    # ankle.idle()
+    # knee.idle()
+    # knee.follow_position()
 
+    #current 
+    #knee.read_current_current()
+
+
+
+    #first movement
+    # knee.position_deg(0)
+    # time.sleep(10)
+    # #oriention 
+    # degKnee = 10
+    # #need to check for float or integar 
+    # knee.position_deg(degKnee)
+    # degAnkle = 10 
+    # ankle.position_deg(degAnkle)
+    # delay = 3 # seconds
+    # time.sleep(delay)
+    # knee.position_deg(90)
+    #time.sleep(30)
+    #degKnee = 0
+    #knee.position_deg(degKnee)
+    #time.sleep(30)
+    #degAnkle = 0
+    #ankle.position_deg(degAnkle)
+    #time.sleep(delay)
+
+   
 
     #velocity
 
 
-    #torque - for this parameter i got an error  
-    #knee.torque_nm(3)
-    #time.sleep(5)
-    #knee.torque_nm(0)
+    #torque  
+    knee.torque_nm(5)
+    
+    time.sleep(10)
+    knee.torque_nm(0)
+
+    
+
     #safety 
     
 
     #2 motors opration simultaneously
     
-#finishing the example
+    #finishing the example
     ankle.idle()
     knee.idle()
     return
