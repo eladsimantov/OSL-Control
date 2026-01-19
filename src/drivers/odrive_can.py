@@ -162,11 +162,12 @@ class ODriveMotor:
         else:
             return mname, sname, v
 
-    def read_current_deg(self):
+    def read_position(self):
         mname,sname,turns =self._read_current_turns()
         if turns is not None:
             self.degrees = 360* (turns / self.gear_ratio)
             print (self.degrees)
+        return self.degrees
         
     def follow_position(self,stop_time=30):
         self.start_time = time.time()
@@ -174,33 +175,40 @@ class ODriveMotor:
         
         while self.current_time-self.start_time <stop_time:
             self.current_time = time.time()
-            self.read_current_deg()
+            self.read_position()
             time.sleep(0.1)
     
+
     #current reading is not working right now
-    # def read_current_current(self):
-    #     candidates = ["iq_measured", "motor_current", "current"]
-    #     mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-    #     if val is None:
-    #         return None, None, None
-    #     try:
-    #         v = float(val)
-    #         return mname, sname, v
-    #     except Exception:
-    #         return mname, sname, None
+    def read_current(self):
+        candidates = ["iq_measured", "motor_current", "current"]
+        mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+        if val is None:
+            return  None
+        try:
+            v = float(val)
+            print (f"Current reading: {v} A")
+            return  v
+        except Exception:
+            return  None
         
-    # def follow_current(self,stop_time=30):
-    #     self.start_time = time.time()
-    #     self.current_time = 0
-        
-    #     while self.current_time-self.start_time <stop_time:
-    #         self.current_time = time.time()
-    #         mname,sname,current = self.read_current_current()
-    #         if current is not None:
-    #             print (f"Current reading: {current} A")
-    #         time.sleep(0.1)
+    def follow_current(self,stop_time=20):
+        start_time = time.time()
+        current_time = 0
+        last_time = 0
+        dt = 0.1 # seconds
+
+        while current_time-start_time <stop_time:
+            if current_time - last_time >= dt:
+                last_time = current_time
+                val = self.read_current()
+                if val is not None:
+                    print (f"Current reading: {val} A")
+            current_time = time.time()
 
     def position_deg(self, deg, absolute=True):
+
+        self.position_control()
         """Command position in degrees.
 
         If absolute==False (default) deg is treated as a relative delta (old behavior).
@@ -262,23 +270,45 @@ class ODriveMotor:
             self.alive = False
 
     #this function cant work without torque measurments
-    # def impedance_control(self, kp=0, kd=0, pos_eq_deg=0.0):
-    #     self.turns = self._read_current_turns()
+    def impedance_control(self, kp=0.1, kd=0, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
         
-    #     #printing: 
+        start_time = 0
+        current_time = 0
+        last_time = 0
+        desired_dt = 0.1 # seconds
 
-    #     if not self.alive:
-    #         return
-    #     try:
-    #         self.can.send_dbc("Axis0_Set_Impedance_Control", {
-    #             "Input_Pos": float(pos_turns),
-    #             "Input_Vel": float(vel_turns_s),
-    #             "Kp": float(kp),
-    #             "Kd": float(kd)
-    #         })
-    #         print(f"{self.name} -> impedance cmd: pos_turns={pos_turns:.6f}, vel_turns_s={vel_turns_s:.6f}, Kp={kp}, Kd={kd}")
-    #     except Exception:
-    #         self.alive = False
+        start_time= time.time()
+
+        while current_time-start_time < stop_time:
+            current_time = time.time()
+            if current_time - last_time >= desired_dt:
+
+                if not self.alive:
+                    return
+            #not right 
+                try:
+                    Current_position = self.read_position()
+                    Current_velocity = 0 # need to find a way to read velocity
+                    print(Current_position)
+
+                except Exception:
+                    self.alive = False
+
+                try:
+                    desired_torque = torque_eq_nm -kp*(Current_position - pos_eq_deg)-kd*(Current_velocity)   
+                    self.torque_nm(desired_torque)
+                    print(f"Desired torque: {desired_torque} Nm")
+                    # Current = self.read_
+                    # print(f"Current {}")
+
+
+                except Exception:
+                    self.alive = False
+
+                last_time = current_time
+
+        
+        
 
 
 
