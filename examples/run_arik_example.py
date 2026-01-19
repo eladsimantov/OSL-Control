@@ -76,13 +76,17 @@ def main():
     # delay = 3 # seconds
     # time.sleep(delay)
     # knee.position_deg(90)
-    #time.sleep(30)
-    #degKnee = 0
-    #knee.position_deg(degKnee)
-    #time.sleep(30)
-    #degAnkle = 0
-    #ankle.position_deg(degAnkle)
-    #time.sleep(delay)
+    # knee.follow_current()
+    # knee.read_current()
+    # time.sleep(10)
+    # knee.read_current()
+    # time.sleep(30)
+    # degKnee = 0
+    # knee.position_deg(degKnee)
+    # time.sleep(30)
+    # degAnkle = 0
+    # ankle.position_deg(degAnkle)
+    # time.sleep(5)
 
    
 
@@ -90,10 +94,11 @@ def main():
 
 
     #torque  
-    knee.torque_nm(5)
-    
-    time.sleep(10)
-    knee.torque_nm(0)
+    # knee.torque_nm(10)
+    # time.sleep(20)
+    # knee.read_position()
+    # time.sleep(30)
+    # knee.torque_nm(0)
 
     
 
@@ -102,6 +107,11 @@ def main():
 
     #2 motors opration simultaneously
     
+    #impedance control
+
+    knee.impedance_control(kp=0.1,stop_time=100)
+
+
     #finishing the example
     ankle.idle()
     knee.idle()
