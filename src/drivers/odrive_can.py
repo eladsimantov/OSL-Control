@@ -206,6 +206,16 @@ class ODriveMotor:
                     print (f"Current reading: {val} A")
             current_time = time.time()
 
+
+    def set_limit_current(self, max_current):
+        try:
+            self.can.send_dbc("Axis0_Set_Limits", {
+                "Current_Limit": float(max_current),
+                "Velocity_Limit": 10.0})
+            print(f"{self.name} -> set current limit: {max_current} A")
+        except Exception:
+            self.alive = False
+
     def position_deg(self, deg, absolute=True):
 
         self.position_control()
@@ -275,7 +285,7 @@ class ODriveMotor:
         start_time = 0
         current_time = 0
         last_time = 0
-        desired_dt = 0.1 # seconds
+        desired_dt = 0.03 # seconds
 
         start_time= time.time()
 
@@ -300,6 +310,7 @@ class ODriveMotor:
                     print(f"Desired torque: {desired_torque} Nm")
                     # Current = self.read_
                     # print(f"Current {}")
+                    self.read_current()
 
 
                 except Exception:
