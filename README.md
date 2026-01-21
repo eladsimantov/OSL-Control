@@ -7,7 +7,7 @@ Turn on motors (connect cable, check battery 100%)
 run can example
 o - turn from idle to closed loop
 
-## Example
+<!-- ## Example
 ===== Dual-Motor Walking Controller =====
 o              - closed loop both motors
 f              - idle both motors
@@ -27,7 +27,7 @@ cal1 <s>       - calibrate knee (optional seconds)
 cal2 <s>       - calibrate ankle (optional seconds)
 save1          - save knee calibration params
 save2          - save ankle calibration params
-x              - exit
+x              - exit -->
 
 
 
@@ -36,9 +36,20 @@ https://docs.odriverobotics.com/v/latest/manual/control.html
 
 the torque is in N-m
 
+# attention
+the voltage of the battery is lower than reccomended by the motor datasheet
 
+in the first try we need to run the sudo line
 
 # updates
 important basic functions:
 1. set state - idle,closed loop, calibration 
 2. control mode - for changing between torque,position and velocity
+
+# Tests
+There is a test script to run position, torque and impedance control 
+
+There are functions to read the current (Q axis) and position sensors.
+
+`test_impedance_knee.py`
+
