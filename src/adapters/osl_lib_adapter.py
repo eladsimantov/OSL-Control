@@ -28,6 +28,8 @@ class ODriveActuator(ActuatorBase):
     """
     Impelementation of the OSL actuators class based on Odrive drivers and can interface.
     """
+    # TODO: Add actual implementation of methods to interface with ODrive motors via CAN.
+    # We may need to override ODriveMotor class as it is unnecessary middleware.
     def __init__(
         self, 
         can_interface: ODriveCAN, 
