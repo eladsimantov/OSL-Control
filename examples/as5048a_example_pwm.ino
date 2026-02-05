@@ -6,6 +6,9 @@
  * - AS5048 GND to Arduino GND
  * - AS5048 VDD5V to Arduino 5V
  * - AS5048 PWM to Arduino DIGITAL PIN 2.
+ * 
+ * Board pinout reference: https://www.alibaba.com/product-detail/AS5048-Magnetic-Encoder-Sets-Pwm-and_62012921404.html
+ * 
  * Linux issues temporary connection to board 
  * bash:     sudo chmod a+rw /dev/ttyACM0
  */
@@ -16,7 +19,7 @@ float dutyCycle;
 float frequency;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(2, INPUT); // Set pin 2 as an input
 }
 
@@ -45,5 +48,5 @@ void loop() {
   Serial.print(frequency);
   Serial.println(" Hz");
 
-  delay(100); // Small delay before the next reading
+  delay(10); // Small delay before the next reading
 }
