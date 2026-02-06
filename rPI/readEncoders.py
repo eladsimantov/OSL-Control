@@ -1,26 +1,42 @@
-import pigpio
-import time
+import pigpio, time
+from collections import deque
 
-# Initialize pigpio
+PIN = 17
+AVG_N = 10    # moving average window
+
 pi = pigpio.pi()
 if not pi.connected:
-    exit()
+    raise SystemExit("pigpio not running")
 
-# GPIO pin for PWM input
-PWM_PIN = 18
-pi.set_mode(PWM_PIN, pigpio.INPUT)
+last_rise = None
+last_period = None
+highs = deque(maxlen=AVG_N)
+duties = deque(maxlen=AVG_N)
 
-# Function to read PWM duty cycle
-def read_pwm_duty_cycle(pin):
-    # Get PWM parameters: returns (duty_cycle, frequency)
-    duty_cycle, frequency = pi.pwm(pin)
-    return duty_cycle / 1000000.0  # Duty cycle as fraction (0.0 to 1.0)
+def cb(gpio, level, tick):
+    global last_rise, last_period
+    if level == 1:  # rising
+        if last_rise is not None:
+            last_period = pigpio.tickDiff(last_rise, tick)
+        last_rise = tick
+    elif level == 0 and last_rise is not None:  # falling
+        high = pigpio.tickDiff(last_rise, tick)  # microseconds
+        if last_period:
+            duty = high / last_period
+            highs.append(high)
+            duties.append(duty)
 
-# Main loop to read and print PWM
+cb = pi.callback(PIN, pigpio.EITHER_EDGE, cb)
+
 try:
     while True:
-        duty = read_pwm_duty_cycle(PWM_PIN)
-        print(f"PWM Duty Cycle: {duty:.3f}")
-        time.sleep(0.1)  # Adjust sampling rate as needed
+        if duties:
+            avg_high = sum(highs) / len(highs)
+            avg_duty = sum(duties) / len(duties)
+            print(f"High(us): {avg_high:.1f}, Duty: {avg_duty*100:.2f}%, Period(us): { (avg_high/(avg_duty) if avg_duty>0 else 0):.0f }")
+        time.sleep(0.05)
 except KeyboardInterrupt:
+    pass
+finally:
+    cb.cancel()
     pi.stop()
