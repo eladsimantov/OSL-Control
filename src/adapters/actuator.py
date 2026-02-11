@@ -1,9 +1,9 @@
 """
-This module implements an adapter for ODrive motors using the OSL (Open Source Leg) framework.
+This module implements an adapter for ODrive drivers + BLDC motors using the OSL (Open Source Leg) framework.
 It defines the ODriveActuator class that extends the ActuatorBase class from OSL, and uses our 
 custom ODrive module and CAN to interface with the actuators.
-The goal is to provide a seamless integration of ODrive motors into the OSL ecosystem, allowing 
-us to leverage OSL's control modes and features while using the simple ODrive hardware.
+The goal is to provide an integration of ODrive motors into the OSL API, allowing 
+us to leverage OSL's architecture while using our ODrive hardware.
 
 Author: Elad Siman Tov
 Date: 2026-01-01
