@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CatalogFile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" RequiredVersion="6.00" xsi:schemaLocation="urn:Microsoft.PlatformBuilder/Catalog PbcXml600.xsd" xmlns="urn:Microsoft.PlatformBuilder/Catalog">
+  <FileInformation Id="FileInformation:FTDI_VCP_x86_CE700CatalogFile">
+    <Title>FTDI_VCP_x86_CE700 Catalog File</Title>
+    <Description>FTDI VCP Driver for x86 WinCE 7.0</Description>
+    <Vendor>FTDI Chip</Vendor>
+    <OSVersion>7.00</OSVersion>
+    <FileVersion>1.1.0.20</FileVersion>
+  </FileInformation>
+  <Item Id="Item:CEContentWiz_Embedded101:FTDI_VCP_x86_CE700:1">
+    <Title>FTDI_VCP_x86_CE700</Title>
+    <Description>FTDI VCP Driver for x86 WinCE 7.0</Description>
+    <Comment>Adds FTDI VCP to an OS</Comment>
+    <SysgenVariable>SYSGEN_FTDI_VCP_X86_CE700</SysgenVariable>
+    <ChooseOneGroup>false</ChooseOneGroup>
+    <Project>$(_WINCEROOT)\3rdParty\FTDI_VCP_x86_CE700\FTDI_VCP_x86_CE700.PBPXML</Project>
+    <Location ConditionLocation="">\FTDI Chip</Location>
+    <SourceCode>
+      <Title>$(_WINCEROOT)\3rdParty\FTDI_VCP_x86_CE700</Title>
+      <Path>$(_WINCEROOT)\3rdParty\FTDI_VCP_x86_CE700</Path>
+    </SourceCode>
+  </Item>
+</CatalogFile>

@@ -1,0 +1,34 @@
+WINCEREL=1
+RELEASETYPE=LOCAL
+_ISVINCPATH=$(_WINCEROOT)\public\common\sdk\inc;
+_OEMINCPATH=$(_WINCEROOT)\public\common\oak\inc;$(_WINCEROOT)\public\common\sdk\inc;
+
+TARGETNAME=FTDI_VCP_x86_CE700
+
+FILE_VIEW_ROOT_FOLDER= \
+  ReadMe.txt \
+  prelink.bat \
+  postlink.bat \
+
+FILE_VIEW_RESOURCE_FOLDER= \
+    .\Resources\ftdi_ser.dll \
+
+
+FILE_VIEW_INCLUDES_FOLDER= \
+
+SOURCES= \
+
+TARGETTYPE=NOTARGET
+PRECOMPILED_CXX=1
+TARGETLIBS= \
+
+
+POSTLINK_PASS_CMD=postlink.bat
+PRELINK_PASS_CMD=prelink.bat
+
+FILE_VIEW_PARAMETER_FOLDER= \
+  FTDI_VCP_x86_CE700.bib \
+  FTDI_VCP_x86_CE700.reg \
+  FTDI_VCP_x86_CE700.dat \
+  FTDI_VCP_x86_CE700.db \
+  ProjSysgen.bat 

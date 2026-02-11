@@ -1,0 +1,60 @@
+
+; FTDIPORT.INF
+; Copyright (c) 2000-2016 FTDI Ltd.
+;
+
+[Version]
+Signature   = "$Windows NT$"        ; required as-is
+Provider    = "Microsoft"           ; maximum of 30 characters, full app name will be "<Provider> <AppName>"
+CESignature = "$Windows CE$"        ; required as-is
+ 
+[CEStrings]
+AppName     = "ftdi_ser.dll"        ; maximum of 40 characters, full app name will be "<Provider> <AppName>"
+
+InstallDir  = %CE2%					; Windows
+[SourceDisksNames]                  ; directory that holds the application's files
+1 = , , , 
+ 
+[SourceDisksFiles]                  ; list of files to be included in .cab
+ftdi_ser.dll = 1
+FTDIPORT.INF = 1
+ 
+[DefaultInstall]                    ; operations to be completed during install
+CopyFiles   = CopyToProgramFiles
+AddReg      = RegData
+ 
+[DestinationDirs]                   ; default destination directories for each operation section
+CopyToProgramFiles    = 0, %InstallDir%
+ 
+[CopyToProgramFiles]                ; copy operation file list
+"ftdi_ser.dll", ftdi_ser.dll
+"FTDIPORT.INF", FTDIPORT.INF
+ 
+[RegData]                           ; registry key list
+HKLM,\Drivers\USB\LoadClients\1027_24577\Default\255\FTDI_DEVICE\,"Prefix",0x00010000,"COM"
+HKLM,\Drivers\USB\LoadClients\1027_24577\Default\255\FTDI_DEVICE\,"LatencyTimer",0x00010001,16
+HKLM,\Drivers\USB\LoadClients\1027_24577\Default\255\FTDI_DEVICE\,"InitialIndex",0x00010001,1
+HKLM,\Drivers\USB\LoadClients\1027_24577\Default\255\FTDI_DEVICE\,"ConfigData",1,01,04,3f,3f,10,27,88,13,C4,09,E2,04,71,02,38,41,9c,80,4E,C0,34,00,1A,00,0D,00,06,40,03,80,00,00,d0,80
+
+HKLM,\Drivers\USB\LoadClients\1027_24592\Default\255\FTDI_DEVICE\,"Prefix",0x00010000,"COM"
+HKLM,\Drivers\USB\LoadClients\1027_24592\Default\255\FTDI_DEVICE\,"LatencyTimer",0x00010001,16
+HKLM,\Drivers\USB\LoadClients\1027_24592\Default\255\FTDI_DEVICE\,"InitialIndex",0x00010001,1
+HKLM,\Drivers\USB\LoadClients\1027_24592\Default\255\FTDI_DEVICE\,"ConfigData",1,01,04,3f,3f,10,27,88,13,C4,09,E2,04,71,02,38,41,9c,80,4E,C0,34,00,1A,00,0D,00,06,40,03,80,00,00,d0,80
+
+HKLM,\Drivers\USB\LoadClients\1027_24593\Default\255\FTDI_DEVICE\,"Prefix",0x00010000,"COM"
+HKLM,\Drivers\USB\LoadClients\1027_24593\Default\255\FTDI_DEVICE\,"LatencyTimer",0x00010001,16
+HKLM,\Drivers\USB\LoadClients\1027_24593\Default\255\FTDI_DEVICE\,"InitialIndex",0x00010001,1
+HKLM,\Drivers\USB\LoadClients\1027_24593\Default\255\FTDI_DEVICE\,"ConfigData",1,01,04,3f,3f,10,27,88,13,C4,09,E2,04,71,02,38,41,9c,80,4E,C0,34,00,1A,00,0D,00,06,40,03,80,00,00,d0,80
+
+HKLM,\Drivers\USB\LoadClients\1027_24596\Default\255\FTDI_DEVICE\,"Prefix",0x00010000,"COM"
+HKLM,\Drivers\USB\LoadClients\1027_24596\Default\255\FTDI_DEVICE\,"LatencyTimer",0x00010001,16
+HKLM,\Drivers\USB\LoadClients\1027_24596\Default\255\FTDI_DEVICE\,"InitialIndex",0x00010001,1
+HKLM,\Drivers\USB\LoadClients\1027_24596\Default\255\FTDI_DEVICE\,"ConfigData",1,01,04,3f,3f,10,27,88,13,C4,09,E2,04,71,02,38,41,9c,80,4E,C0,34,00,1A,00,0D,00,06,40,03,80,00,00,d0,80
+
+HKLM,\Drivers\USB\LoadClients\1027_24597\Default\255\FTDI_DEVICE\,"Prefix",0x00010000,"COM"
+HKLM,\Drivers\USB\LoadClients\1027_24597\Default\255\FTDI_DEVICE\,"LatencyTimer",0x00010001,16
+HKLM,\Drivers\USB\LoadClients\1027_24597\Default\255\FTDI_DEVICE\,"InitialIndex",0x00010001,1
+HKLM,\Drivers\USB\LoadClients\1027_24597\Default\255\FTDI_DEVICE\,"ConfigData",1,01,04,3f,3f,10,27,88,13,C4,09,E2,04,71,02,38,41,9c,80,4E,C0,34,00,1A,00,0D,00,06,40,03,80,00,00,d0,80
+
+
+
