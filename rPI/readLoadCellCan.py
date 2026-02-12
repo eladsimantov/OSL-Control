@@ -9,6 +9,10 @@ BITRATE = 1000000  # Default is 1Mb/s
 ID_QUERY = 0x80    # ID #1: Master to Sensor [cite: 483]
 ID_REPLY = [0x291, 0x292, 0x293] # IDs #2, #3, #4 [cite: 485, 487, 489]
 
+# CRATE, CFIDL and CTXIDL
+
+
+
 def setup_can():
     os.system(f"sudo ip link set {CAN_CH} down")
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
@@ -41,6 +45,7 @@ def main():
                       f"Torque: {data['MX']:7.2f} {data['MY']:7.2f} {data['MZ']:7.2f}")
 
     except KeyboardInterrupt:
+        # To stop get data continuously, master should send 0(0x00) with ID #1 to M8123B2
         # Send 0x00 to stop data [cite: 496]
         bus.send(can.Message(arbitration_id=ID_QUERY, data=[0x00], is_extended_id=False))
         bus.shutdown()
