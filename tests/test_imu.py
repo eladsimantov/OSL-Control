@@ -10,7 +10,7 @@ import time
 
 from src.adapters.imu import BNO055Adapter
 
-if __name__ == "__main__":
+def test_imu():
     print("\n" + "="*50)
     print("      BNO055 IMU ADAPTER TEST (6-AXIS) ")
     print("="*50 + "\n")
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             
             # Display 6-Axis Data
             print(f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | "
-                  f"Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}]", end='\r')
+                f"Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}]", end='\r')
             
             time.sleep(0.05)
 
@@ -60,3 +60,6 @@ if __name__ == "__main__":
         # 3. Safe Shutdown
         imu.stop()
         print("[INFO] Cleanup complete. Sensor stopped.")
+
+if __name__ == "__main__":
+    test_imu()

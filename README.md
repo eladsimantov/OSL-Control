@@ -72,3 +72,7 @@ We are using the TKmotor (CubeMars) AK80-9 BLDC motors
 We are using AMT102-V incremental encoders
 ([see here](https://www.sameskydevices.com/product/resource/amt10.pdf)).
 See also the [Mounting guide](https://www.sameskydevices.com/resources/resource-library/videos/mounting-the-amt10-and-10e-modular-encoder-series).
+
+
+## LoadCell
+We are using Sunrise Instruments Loadcell with its OEM board. 

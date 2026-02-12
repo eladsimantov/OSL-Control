@@ -1,19 +1,20 @@
-# !/usr/bin/env python3
-import os
-import sys
-tests_path = os.path.dirname(os.path.abspath(__file__))
-project_path = os.path.join(tests_path, "..")
-sys.path.insert(0, project_path)
-from src.drivers.odrive_can import ODriveMotor, ODriveCAN
-from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
+from tests.test_actuator import test_actuator
+from tests.test_imu import test_imu
+from tests.test_loadcell import test_loadcell
 
 if __name__ == "__main__":
-    can1 = ODriveCAN(node_id=1)
-    kneeActuator = ODriveActuator(
-                tag="act1",
-                can_interface=can1,
-                gear_ratio=100,
-                motor_constants=MOTOR_CONSTANTS(2048, 0.02, 0.001, 0.0001, 80.0, 120.0)
-    )
-    # TODO: add test cases based on the examples.
-    print("\n ------------------------ \n")
+    print("\n" + "="*50)
+    print("      ROBOT SENSOR/ACTUATOR TESTS ")
+    print("="*50 + "\n")
+    input("Press Enter to start the IMU test...")
+    test_imu()
+    
+    input("Press Enter to start the Load Cell test...")
+    test_loadcell()
+
+    input("Press Enter to start the Actuator test...")
+    test_actuator()
+
+    print("\n" + "="*50)
+    print("      ALL TESTS COMPLETED ")
+    print("="*50 + "\n")
