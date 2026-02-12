@@ -40,8 +40,9 @@ class SRILoadCell_M8123B2(LoadcellBase):
         self._id_replies = [0x291, 0x292, 0x293] 
         
         self._data: npt.NDArray[np.double] = np.zeros(6)
+        self._offset: npt.NDArray[np.double] = np.zeros(6)
         self._is_streaming: bool = False
-        self._is_calibrated: bool = True  # Factory calibrated internal matrix
+        self._is_calibrated: bool = False
         self._bus = None
 
     def start(self) -> None:
@@ -96,18 +97,30 @@ class SRILoadCell_M8123B2(LoadcellBase):
             self._bus.shutdown()
         self._is_streaming = False
 
-    def calibrate(self) -> None:
-        """Calibration is handled internally by the M8123B2 hardware."""
-        pass
+    def calibrate(self, n_samples: int = 2000) -> None:
+        """Perform a software zeroing routine by averaging samples."""
+        LOGGER.info(f"[{self.tag}] Starting zeroing routine. Ensure the sensor is unloaded.")
+        input("Press Enter to start...")
+        
+        samples = []
+        for _ in range(n_samples):
+            self.update()
+            samples.append(self._data.copy())
+            
+        self._offset = np.mean(samples, axis=0)
+        self._is_calibrated = True
+        LOGGER.info(f"[{self.tag}] Zeroing complete.")
 
     def reset(self) -> None:
-        """Resets the local data buffer."""
+        """Resets the local data and offsets."""
         self._data = np.zeros(6)
+        self._offset = np.zeros(6)
+        self._is_calibrated = False
 
     @property
     def data(self) -> list[float]:
-        """Returns [Fx, Fy, Fz, Mx, My, Mz]."""
-        return self._data.tolist()
+        """Returns zeroed [Fx, Fy, Fz, Mx, My, Mz]."""
+        return (self._data - self._offset).tolist()
 
     @property
     def is_streaming(self) -> bool: return self._is_streaming
@@ -115,16 +128,16 @@ class SRILoadCell_M8123B2(LoadcellBase):
     @property
     def is_calibrated(self) -> bool: return self._is_calibrated
 
-    # Individual Axis Properties for OSL API compatibility
+    # Individual Axis Properties with offset subtraction
     @property
-    def fx(self) -> float: return float(self._data[0])
+    def fx(self) -> float: return float(self._data[0] - self._offset[0])
     @property
-    def fy(self) -> float: return float(self._data[1])
+    def fy(self) -> float: return float(self._data[1] - self._offset[1])
     @property
-    def fz(self) -> float: return float(self._data[2])
+    def fz(self) -> float: return float(self._data[2] - self._offset[2])
     @property
-    def mx(self) -> float: return float(self._data[3])
+    def mx(self) -> float: return float(self._data[3] - self._offset[3])
     @property
-    def my(self) -> float: return float(self._data[4])
+    def my(self) -> float: return float(self._data[4] - self._offset[4])
     @property
-    def mz(self) -> float: return float(self._data[5])
+    def mz(self) -> float: return float(self._data[5] - self._offset[5])
