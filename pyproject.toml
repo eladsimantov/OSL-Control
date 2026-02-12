@@ -1,0 +1,41 @@
+[build-system]
+# This tells Python how to "build" your project. 
+# We use 'setuptools' which is the industry standard for Python projects.
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# Basic metadata about the project
+name = "osl-control"
+version = "0.1.0"
+description = "Control framework for OpenSourceLeg using ODrive, SRI Load Cell, and other I2C interfaced sensors."
+
+# DEPENDENCIES: 
+# These are the external libraries required for the project to run.
+# Running 'pip install -e .' will automatically install these for you.
+dependencies = [
+    "opensourceleg",                 # The main OSL SDK
+    "python-can",                    # For CAN bus communication (Loadcell/ODrive)
+    "numpy",                         # For sensor data processing and math
+    "adafruit-circuitpython-bno055", # IMU driver
+    "adafruit-blinka"                # Linux-to-CircuitPython bridge
+]
+
+[tool.setuptools]
+# STUDENT NOTE: This section tells Python that our project code is 
+# located in the 'src' and 'tests' folders. By installing this in 
+# 'editable mode' (pip install -e .), you can import 'src' modules 
+# from anywhere in the project without manually hacking sys.path.
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "tests*"]
+
+# -------------------------------------------------------------------------
+# HOW TO USE THIS:
+# 1. Open a terminal in this project folder.
+# 2. Run: pip install -e .
+# 3. You can now use: "from src.adapters.imu import BNO055Adapter" 
+#    in any file, regardless of where that file is saved!
+# -------------------------------------------------------------------------
