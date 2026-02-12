@@ -7,9 +7,32 @@ from opensourceleg.logging import LOGGER
 
 class SRILoadCell_M8123B2(LoadcellBase):
     """
-    Implementation for the Sunrise Instruments 6 axis load cell via M8123B2 board.
-    This adapter handles the CAN interface for the SRI sensor within the OSL framework.
-    It is assumed that the decoupling matrix is embedded into the board by the manufacturer.
+    Standardized OSL Adapter for the Sunrise Instruments (SRI) 6-Axis Loadcell.
+
+    Hardware Overview:
+    ------------------
+    This class interfaces with an SRI 6-axis sensor connected to an M8123B2 OEM 
+    circuit board. The board handles the complex analog-to-digital conversion 
+    and applies a factory-embedded 6x6 decoupling matrix.
+
+    Communication Details:
+    ----------------------
+    - Protocol: SocketCAN (CAN Bus).
+    - Interface: Requires a CAN-FD or Standard CAN HAT (typically 'can1' on RPi).
+    - Data Format: Receives three sequential 8-byte UDP packets containing 
+      32-bit IEEE 754 floating-point numbers.
+    - Sample IDs: ID 0x291 (FX, FY), ID 0x292 (FZ, MX), ID 0x293 (MY, MZ).
+
+    Processing Logic:
+    -----------------
+    1. Internal Decoupling: It is assumed the board is pre-calibrated by SRI. 
+       Forces (F) and Moments (M) arrive as final engineering units (N and Nm).
+    2. Software Tare: Since the sensor often carries the weight of a foot or 
+       attachment, the `calibrate()` method measures a static baseline (bias) 
+       and subtracts it from all live readings to ensure a 'Zero' starting point.
+    
+    Author: Elad Siman Tov
+    Date: 2026-01-01
     """
 
     def __init__(
