@@ -54,9 +54,8 @@ def test_loadcell():
             # Print Force (N) and Moments (Nm)
             # Moments use properties mx, my, mz from your class
             print(f"F(xyz) N: [{loadcell.fx:6.2f}, {loadcell.fy:6.2f}, {loadcell.fz:6.2f}] | "
-                  f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\r')
+                  f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\n')
             
-            time.sleep(0.05)
 
     except KeyboardInterrupt:
         print("\n\n[INFO] Stop signal received.")
