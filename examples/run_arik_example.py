@@ -21,7 +21,7 @@ sys.path.insert(0, project_path)
 from src.drivers.odrive_can import ODriveMotor
 from src.drivers.odrive_can import ODriveCAN
 
-os.system("sudo ip link set can0 up type can bitrate 250000")
+# os.system("sudo ip link set can0 up type can bitrate 250000")
 
 #probably we need the second class also, maybe even the third 
 #we want to move to one command for initiation, not 2 or more 
@@ -109,13 +109,13 @@ def main():
     #2 motors opration simultaneously
     
     #impedance control
-    knee.set_limit_current(4)
-    # knee.torque_nm(5)
-    # knee.follow_current()
-    # time.sleep(10)
-    knee.impedance_control(kp=0.05,stop_time=100)
-
-
+    knee.set_limit_current(4,10)
+    knee.torque_nm(5)
+    knee.follow_current()
+    
+    #knee.impedance_control(kp=0.05,stop_time=100)
+    knee.position_deg(0)
+    time.sleep(10)
     #finishing the example
     ankle.idle()
     knee.idle()
