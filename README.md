@@ -76,3 +76,5 @@ See also the [Mounting guide](https://www.sameskydevices.com/resources/resource-
 
 ## LoadCell
 We are using Sunrise Instruments Loadcell with its OEM board. 
+
+https://technionmail-my.sharepoint.com/:w:/g/personal/elad_sim_campus_technion_ac_il/IQB34CwJhmjCRr4ecyUJv1SMATLv-zqkLTahnImUDXmteCA?e=xWJupW
