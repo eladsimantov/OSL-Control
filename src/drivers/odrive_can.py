@@ -207,11 +207,11 @@ class ODriveMotor:
             current_time = time.time()
 
 
-    def set_limit_current(self, max_current):
+    def set_limit_current(self, max_current, max_velocity=5.0):
         try:
             self.can.send_dbc("Axis0_Set_Limits", {
                 "Current_Limit": float(max_current),
-                "Velocity_Limit": 10.0})
+                "Velocity_Limit": float(max_velocity)})
             print(f"{self.name} -> set current limit: {max_current} A")
         except Exception:
             self.alive = False
