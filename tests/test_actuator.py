@@ -11,7 +11,6 @@ from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 # from opensourceleg.actuators import MOTOR_CONSTANTS
 
 
-
 def test_position_control():
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
     can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
@@ -35,11 +34,11 @@ def test_velocity_control():
     print("\n Velocity Control Example \n")
     knee.closed_loop()
     time.sleep(3)
-    knee.velocity_deg_s(3)
-    
+    knee.velocity_deg_s(1)
+    knee.follow_velocity()
     time.sleep(10)
     print("\n ------------------------ \n")
-    knee.idle()torque_e
+    knee.idle()
 
 def test_torque_control():
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
@@ -69,9 +68,11 @@ def test_impedance_control():
     #knee.set_limit_current(10,10)
     #for refrence: impedance_control(self, kp=0.1, kd=0, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0)
     knee.impedance_control()
+    
     time.sleep(20)
     print("\n ------------------------ \n")
     knee.idle()
+
 
 if __name__ == "__main__":
     CAN_CH = 'can0'
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     os.system(f"source /home/enable-lab/Desktop/OSL-Control/.venv/bin/activate")
     os.system(f"sudo ip link set {CAN_CH} down")
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
-    #test_position_control()
+    test_position_control()
     #test_velocity_control()
     #test_torque_control()
     #test_impedance_control()

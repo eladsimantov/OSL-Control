@@ -280,13 +280,13 @@ class ODriveMotor:
             self.alive = False
 
     #this function cant work without torque measurments
-    def impedance_control(self, kp=0.05, kd=1, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
+    def impedance_control(self, kp=0.1, kd=0.1, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
         
         start_time = 0
         current_time = 0
         last_time = 0
         desired_dt = 0.01 # seconds
-
+        last_position = 0
         start_time= time.time()
 
         while current_time-start_time < stop_time:
@@ -298,8 +298,14 @@ class ODriveMotor:
             #not right 
                 try:
                     Current_position = self.read_position()
-                    Current_velocity = 0 # need to find a way to read velocity
-                    print(Current_position)
+                    #option 1 for velocity measurement: numerical differentiation
+                    Current_velocity = (Current_position-last_position)/desired_dt
+                    # need to find a way to read velocity
+                    last_position = Current_position
+                    print(f"Current position: {Current_position} deg")
+                    
+
+
 
                 except Exception:
                     self.alive = False
@@ -321,6 +327,30 @@ class ODriveMotor:
         
         
 
+    def get_velocity(self):
+
+
+        candidates = ["vel_estimate", "velocity", "encoder_vel", "velocity_estimate"]
+        mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+        if val is None:
+            return None
+        try:
+            v = float(val)
+            deg_s = (v / self.gear_ratio) * 360.0
+            print(f"Velocity reading: {deg_s} deg/s")
+            return deg_s
+        except Exception:
+            return None
+
+    def follow_velocity(self,stop_time=30):
+        self.start_time = time.time()
+        self.current_time = 0
+        
+        while self.current_time-self.start_time <stop_time:
+            self.current_time = time.time()
+            self.get_velocity()
+            time.sleep(0.1)
+    
 
 
     def encoder_reset(self):

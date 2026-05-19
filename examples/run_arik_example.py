@@ -104,7 +104,7 @@ def main():
     #2 motors opration simultaneously
     
     #impedance control
-    knee.set_limit_current(4,5)
+    #knee.set_limit_current(4,5)
     # knee.torque_nm(5)
     # knee.follow_current()
     
