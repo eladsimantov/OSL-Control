@@ -280,12 +280,12 @@ class ODriveMotor:
             self.alive = False
 
     #this function cant work without torque measurments
-    def impedance_control(self, kp=0.1, kd=0, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
+    def impedance_control(self, kp=0.05, kd=1, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
         
         start_time = 0
         current_time = 0
         last_time = 0
-        desired_dt = 0.03 # seconds
+        desired_dt = 0.01 # seconds
 
         start_time= time.time()
 
