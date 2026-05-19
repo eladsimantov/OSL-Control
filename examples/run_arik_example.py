@@ -29,20 +29,20 @@ from src.drivers.odrive_can import ODriveCAN
 
 def main():
     #initiation 
-    can1 = ODriveCAN(node_id=1)
+    can1 = ODriveCAN(node_id=0,dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc")
     knee = ODriveMotor(can1, name="knee",gear_ratio=40)
-    can2 = ODriveCAN(node_id=2)
-    ankle = ODriveMotor(can2, name="ankle")
+    # can2 = ODriveCAN(node_id=2)
+    # ankle = ODriveMotor(can2, name="ankle")
     
     # calibration - make new funciton to reset_position to zero 
-    ankle.calibrate(5) # for 5 seconds..
+    # ankle.calibrate(5) # for 5 seconds..
     knee.calibrate(5)
     #there is a problem with the calibration
 
 
     #happens outimatically in calibrate function!
     #ankle.closed_loop()
-    #knee.closed_loop()
+    knee.closed_loop()
     #time.sleep(3)
 
     
@@ -54,19 +54,14 @@ def main():
 #if we use sleep,the leg need time to reach the position. the code runs before it.
 
     #sensing:
-    #trajectory
-    # ankle.idle()
-    # knee.idle()
-    # knee.follow_position()
-
-    #current 
-    #knee.read_current_current()
+    #trajectory------------------------
+    # knee.read_current_current()
 
 
 
     #first movement
-    # knee.position_deg(0)
-    # time.sleep(10)
+    knee.position_deg(0)
+    time.sleep(10)
     # #oriention 
     # degKnee = 10
     #need to check for float or integar 
@@ -109,15 +104,15 @@ def main():
     #2 motors opration simultaneously
     
     #impedance control
-    knee.set_limit_current(4,10)
-    knee.torque_nm(5)
-    knee.follow_current()
+    knee.set_limit_current(4,5)
+    # knee.torque_nm(5)
+    # knee.follow_current()
     
     #knee.impedance_control(kp=0.05,stop_time=100)
-    knee.position_deg(0)
+    knee.position_deg(20)
     time.sleep(10)
     #finishing the example
-    ankle.idle()
+    # ankle.idle()
     knee.idle()
     return
 

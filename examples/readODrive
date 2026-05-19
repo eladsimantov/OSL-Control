@@ -1,0 +1,147 @@
+import os
+import can
+import struct
+import time
+import cantools
+
+# --- Configuration ---
+CAN_CH = 'can0'
+BITRATE = 1000000  # Default is 1Mb/s 
+# ID_QUERY = 0x80    # ID #1: Master to Sensor [cite: 483]
+# ID_REPLY = [0x291, 0x292, 0x293] # IDs #2, #3, #4 [cite: 485, 487, 489]
+
+# CRATE, CFIDL and CTXIDL
+node_id = 1 # must match `<odrv>.axis0.config.can.node_id`. The default is 0.
+cmd_id = 0x01 # heartbeat command ID
+message_id = (node_id << 5 | cmd_id)
+bus_name = "can0"
+dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
+
+    
+def setup_can():
+    os.system(f"sudo ip link set {CAN_CH} down")
+    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
+    # return can.interface.Bus(channel=CAN_CH, interface='socketcan')
+    # def __init__(self, bus_name="can0", node_id=1, dbc_path="/home/enable-lab/OSL-Control/src/drivers/odrive-cansimple.dbc"):
+    # from can_example_2026 import ODriveCAN
+    # from can_example_2026 import ODriveMotor
+
+    # can0 = ODriveCAN(bus_name=bus_name, node_id=node_id, dbc_path=dbc_path)
+    # knee = ODriveMotor(can0, 40, "knee")
+    # return can.interface.Bus(channel=CAN_CH, interface="socketcan")
+
+    return can.interface.Bus(channel=CAN_CH, interface="socketcan")
+    
+    #     try:
+            # self.db = cantools.database.load_file(dbc_path="/home/enable-lab/OSL-Control/src/drivers/odrive-cansimple.dbc")
+    #     except Exception:
+    #         self.db = None
+    #     self.latest = {}  # {(axis, message_name): signals_dict}
+    #     self._listener_thread = threading.Thread(target=self._listener, daemon=True)
+    #     self._listener_thread.start()
+    #     # data = self.db.encode_message(message_name, signals)
+
+
+def main():
+    print('hello')
+    bus = setup_can()
+    bus.db = cantools.database.load_file(dbc_path)
+    print('hello shay')
+
+    # Send 0x02 to ID #1 to start continuous data [cite: 494, 495]
+    # msg = can.Message(arbitration_id=1, is_extended_id=False,data=[0x02])
+    # bus.send(msg)
+    while not (bus.recv(timeout=0) is None): pass
+
+    # cmd_id = 0x01 # heartbeat command ID
+    # message_id = (node_id << 5 | cmd_id)
+    # data = bus.db.encode_message(message_name, signals)
+    # message = bus.db.get_message_by_name(message_name)
+    # arb_id = (bus.axisID << 5) | message.frame_id
+    # import struct
+
+# for msg in bus:
+#   if msg.arbitration_id == message_id
+#       error, state, result, traj_done = struct.unpack('<IBBB', bytes(msg.data[:7]))
+#       break
+# print(error, state, result, traj_done)
+
+#     bus.send(can.Message(
+#     arbitration_id=(node_id << 5 | 0x07), # 0x07: Set_Axis_State
+#     data=struct.pack('<I', 8), # 8: AxisState.CLOSED_LOOP_CONTROL
+#     is_extended_id=False))
+
+#     bus.send(can.Message(
+#     arbitration_id=(node_id << 5 | 0x0d), # 0x0d: Set_Input_Vel
+#     data=struct.pack('<ff', 1.0, 0.0), # 1.0: velocity, 0.0: torque feedforward
+#     is_extended_id=False))
+
+# data = {"FX": 0.0, "FY": 0.0, "FZ": 0.0, "MX": 0.0, "MY": 0.0, "MZ": 0.0}
+#     # print('hello')
+
+#     try:
+#         # while True:
+#         #     for msg in bus:
+#         #         if msg.arbitration_id == message_id:
+#         #             error, state, result, traj_done = struct.unpack('<IBBB', bytes(msg.data[:7]))
+#         #             break
+#         #         print(error, state, result, traj_done)
+#         #         if msg is None: continue
+
+#                 print('hello  Shay')
+# a = bus.db.encode_modrv0.axis0.controller.input_pos = 10knee.velocity_rpm(100).0essage(message_name, signals)
+#     # message = bus.db.get_message_by_name(message_name)
+#     # arb_
+                
+
+#                 # bus.send(can.Message(
+#                 # arbitration_id=(node_id << 5 | 0x07), # 0x07: Set_Axis_State
+#                 # data=struct.pack('<I', 8), # 8: AxisState.CLOSED_LOOP_CONTROL
+#                 # is_extended_id=False))
+
+
+#                 msg = bus.recv(timeout=10.0)
+#                 print(msg)
+#                 # ans = struct.unpack('<IBBB', bytes(msg.data[:7]))
+#                 # print(ans)
+
+                
+#                 # bus.send_dbc("Axis0_Set_Input_Pos", {
+#                 #     "Input_Pos": float(target_turns),
+#                 #     "Vel_FF": 30.0,
+#                 #     "Torque_FF": 1.0})
+                
+#                 # bus.send(arb_id, data)
+
+
+#                 # # for msg in bus:
+#                 # # if msg.arbitration_id == (node_id << 5 | 0x09): # 0x09: Get_Encoder_Estimates
+#                 # podrv0.axis0.controller.input_pos = 10.0os, vel = struct.unpack('<ff', bytes(msg.data))
+#                 # print(f"pos: {pos:.3f} [turns], vel: {vel:.3f} [turns/s]")
+
+#                 # bus.send(can.Message(
+#                 # arbitration_id=(node_id << 5 | 0x0c), # 0x0d: Set_Input_Vel
+#                 # data=struct.pack('<ff', 1.0, 1.0), # 1.0: velocity, 0.0: torque feedforward
+#                 # is_extended_id=False))
+                        
+        
+#             # # Unpack 4-byte Floats [cite: 501, 502]
+#             # if msg.arbitration_id == 0x291:
+#             #     data["FX"], data["FY"] = struct.unpack('<ff', msg.data)
+#             # elif msg.arbitration_id == 0x292:
+#             #     data["FZ"], data["MX"] = struct.unpack('<ff', msg.data)
+#             # elif msg.arbitration_id == 0x293:
+#             #     data["MY"], data["MZ"] = struct.unpack('<ff', msg.data)
+                
+#             #     # Print full set once ID #4 is received [cite: 498]
+#             #     print(f"Force: {data['FX']:7.2f} {data['FY']:7.2f} {data['FZ']:7.2f} | "
+#             #           f"Torque: {data['MX']:7.2f} {data['MY']:7.2f} {data['MZ']:7.2f}")
+
+#     except KeyboardInterrupt:
+#         # To stop get data continuously, master should send 0(0x00) with ID #1 to M8123B2
+#         # Send 0x00 to stop data [cite: 496]
+#         # bus.send(can.Message(arbitration_id=ID_QUERY, data=[0x00], is_extended_id=False))
+#         bus.shutdown()
+
+if __name__ == "__main__":
+    main()

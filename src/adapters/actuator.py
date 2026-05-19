@@ -70,7 +70,7 @@ class ODriveActuator(ActuatorBase):
     def update(self):
         print("Updated")
     def set_motor_voltage(self, value: float) -> None:
-        print(f"Motor voltage set to {value}")
+        print(f"MotoODriveActuatorr voltage set to {value}")
     def set_motor_current(self, value: float) -> None:
         print(f"Motor current set to {value}")
     def set_motor_position(self, value: float) -> None:

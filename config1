@@ -1,0 +1,234 @@
+  auth1(p0: uint64, p1: uint64, p2: uint64, p3: uint64) -> (p0: uint64, p1: uint64, p2: uint64, p3: uint64, p4: uint64, p5: uint64, p6: uint64, p7: uint64)
+  get_cert1(part: uint8) -> (p0: uint64, p1: uint64, p2: uint64, p3: uint64)
+  get_pub_key1() -> (p0: uint64, p1: uint64, p2: uint64, p3: uint64, p4: uint64, p5: uint64, p6: uint64, p7: uint64)
+axis0:
+  active_errors: 0 (uint32)
+  commutation_mapper: {...}
+  config: {...}
+  controller: {...}
+  current_state: 1 (uint8)
+  detailed_disarm_reason: 0 (uint32)
+  disarm_reason: 0 (uint32)
+  disarm_time: 0.0 (float)
+  enable_pin: {...}
+  interpolator: {...}
+  is_armed: False (bool)
+  is_homed: False (bool)
+  last_drv_fault: 0 (uint32)
+  max_endstop: {...}
+  mechanical_brake: {...}
+  min_endstop: {...}
+  motor: {...}
+  observed_encoder_scale_factor: nan (float)
+  pos_estimate: 8.249282836914062e-05 (float)
+  pos_vel_mapper: {...}
+  procedure_result: 0 (uint8)
+  requested_state: 0 (uint8)
+  set_abs_pos(pos: float) -> delta_pos_ref: float
+  step_dir_active: False (bool)
+  steps: 0 (int64)
+  task_times: {...}
+  trap_traj: {...}
+  vel_estimate: 0.012300697155296803 (float)
+  watchdog_feed()
+bootloader_version: 16777216 (uint32)
+brake_resistor0:
+  additional_duty: 0.0 (float)
+  chopper_temp: 31.83148193359375 (float)
+  current: 0.0 (float)
+  current_meas: nan (float)
+  current_meas_status: 3 (uint32)
+  duty: 0.0 (float)
+  is_armed: False (bool)
+  was_saturated: False (bool)
+can:
+  config: {...}
+  effective_baudrate: 250000 (uint32)
+  error: 0 (uint8)
+  n_restarts: 0 (uint32)
+  n_rx: 0 (uint32)
+clear_errors()
+commit_hash: 3016019781 (uint32)
+config:
+  brake_resistor0: {...}
+  dc_bus_overvoltage_trip_level: 30.0 (float)
+  dc_bus_undervoltage_trip_level: 14.0 (float)
+  dc_max_negative_current: -inf (float)
+  dc_max_positive_current: inf (float)
+  enable_uart_a: False (bool)
+  gpio0_mode: 17 (uint8)
+  gpio10_mode: 17 (uint8)
+  gpio11_analog_mapping: {...}
+  gpio11_mode: 17 (uint8)
+  gpio12_mode: 17 (uint8)
+  gpio1_analog_mapping: {...}
+  gpio1_mode: 17 (uint8)
+  gpio2_mode: 17 (uint8)
+  gpio3_mode: 17 (uint8)
+  gpio4_mode: 17 (uint8)
+  gpio5_mode: 17 (uint8)
+  gpio6_mode: 17 (uint8)
+  gpio7_mode: 17 (uint8)
+  gpio8_mode: 17 (uint8)
+  gpio8_pwm_mapping: {...}
+  gpio9_mode: 17 (uint8)
+  inverter0: {...}
+  max_regen_current: 0.0 (float)
+  uart0_protocol: 3 (uint8)
+  uart_a_baudrate: 115200 (uint32)
+  usb_cdc_protocol: 3 (uint8)
+  user_config_0: 0 (uint32)
+  user_config_1: 0 (uint32)
+  user_config_2: 0 (uint32)
+  user_config_3: 0 (uint32)
+  user_config_4: 0 (uint32)
+  user_config_5: 0 (uint32)
+  user_config_6: 0 (uint32)
+  user_config_7: 0 (uint32)
+control_loop_hz: 8000 (uint32)
+debug:
+  adc_slot_0_raw: 1073679644 (uint32)
+  adc_slot_10_raw: 51381739 (uint32)
+  adc_slot_1_raw: 294207487 (uint32)
+  adc_slot_2_raw: 294273023 (uint32)
+  adc_slot_3_raw: 123085020 (uint32)
+  adc_slot_4_raw: 555556762 (uint32)
+  block(us: uint32)
+  factory_data_end(length: uint32) -> success: bool
+  factory_data_loaded: False (bool)
+  factory_data_start() -> success: bool
+  factory_data_write(val: uint8)
+  hal_ticks: 78144 (uint32)
+  mcu_temperature: 37.05882263183594 (float)
+  vref: 3.2956550121307373 (float)
+disable_bootloader() -> ok: bool
+encoder_estimator0:
+  pos_estimate: 0.6929776072502136 (float)
+  status: 0 (uint8)
+  vel_estimate: -0.0105725834146142 (float)
+encoder_estimator1:
+  pos_estimate: 0.0 (float)
+  status: 13 (uint8)
+  vel_estimate: 0.0 (float)
+enter_dfu_mode()
+enter_dfu_mode2() -> ok: bool
+erase_configuration()
+fw_version_major: 0 (uint8)
+fw_version_minor: 6 (uint8)
+fw_version_revision: 11 (uint8)
+fw_version_unreleased: 0 (uint8)
+get_adc_voltage(gpio: uint32) -> voltage: float
+get_dma_status(stream_num: uint8) -> status: uint32
+get_drv_fault() -> drv_fault: uint64
+get_gpio_states() -> status: uint32
+get_interrupt_status(irqn: int32) -> status: uint32
+get_raw(address: uint32) -> value: uint32
+get_raw_256(address: uint32) -> (val0: uint64, val1: uint64, val2: uint64, val3: uint64)
+get_raw_32(address: uint32) -> value: uint32
+get_raw_8(address: uint32) -> value: uint8
+hall_encoder0:
+  abs_pos_max: 0.0 (float)
+  abs_pos_min: 0.0 (float)
+  config: {...}
+  hall_cnt: 255 (uint8)
+  raw_hall_state: 0 (uint8)
+  status: 14 (uint8)
+hw_version_major: 5 (uint8)
+hw_version_minor: 2 (uint8)
+hw_version_revision: 6 (uint8)
+hw_version_variant: 0 (uint8)
+ibus: 0.0 (float)
+ibus_report_filter_k: 1.0 (float)
+identify: False (bool)
+identify_once()
+inc_encoder0:
+  config: {...}
+  pos_max: 0.0 (float)
+  pos_min: 0.0 (float)
+  pos_residual: 0.0 (float)
+  raw: 0 (uint16)
+  raw_wrapped: 0 (int32)
+  status: 0 (uint8)
+issues:
+  get(index: uint32) -> (addr: uint32, line: uint32, arg1: uint32, arg2: uint32)
+  length: 0 (uint32)
+misconfigured: False (bool)
+n_evt_control_loop: 620827 (uint32)
+n_evt_sampling: 620829 (uint32)
+onboard_encoder0:
+  get_field_strength() -> field_strength: float
+  raw: 0.6927490234375 (float)
+  status: 0 (uint8)
+oscilloscope:
+  config(addr0: uint32, addr1: uint32, addr2: uint32, addr3: uint32, addr4: uint32, addr5: uint32, addr6: uint32, addr7: uint32, addr8: uint32)
+  get_raw(offset: uint32) -> (val0: uint64, val1: uint64, val2: uint64, val3: uint64)
+  pos: 0 (uint32)
+  recording: False (bool)
+  rollover: False (bool)
+  size: 65536 (uint32)
+  trigger(trigger_point: float)
+  trigger_high_res()
+  trigger_pos: 0 (uint32)
+  triggered_at: 0 (uint32)
+reboot()
+reboot_required: False (bool)
+rs485_encoder_group0:
+  config: {...}
+  raw: 0.0 (float)
+  raw32: 0 (uint32)
+  status: 10 (uint8)
+rs485_encoder_group1:
+  config: {...}
+  raw: 0.0 (float)
+  raw32: 0 (uint32)
+  status: 10 (uint8)
+save_configuration() -> success: bool
+serial_number: 144157574190 (uint64)
+set_gpio(num: uint32, status: bool) -> ok: bool
+spi_encoder0:
+  config: {...}
+  get_field_strength() -> field_strength: float
+  inject_errors: False (bool)
+  n_errors: 0 (uint32)
+  raw: 0.0 (float)
+  status: 14 (uint8)
+  warning: False (bool)
+spi_encoder1:
+  config: {...}
+  get_field_strength() -> field_strength: float
+  inject_errors: False (bool)
+  n_errors: 0 (uint32)
+  raw: 0.0 (float)
+  status: 14 (uint8)
+  warning: False (bool)
+system_stats:
+  i2c: {...}
+  max_stack_usage_axis: 876 (uint32)
+  max_stack_usage_comms: 456 (uint32)
+  max_stack_usage_startup: 340 (uint32)
+  max_stack_usage_uart: 3904 (uint32)
+  min_heap_space: 56240 (uint32)
+  prio_axis: 3 (int32)
+  prio_comms: 0 (int32)
+  prio_startup: 0 (int32)
+  prio_uart: -3 (int32)
+  stack_size_axis: 2048 (uint32)
+  stack_size_comms: 4096 (uint32)
+  stack_size_startup: 2048 (uint32)
+  stack_size_uart: 4096 (uint32)
+  uptime: 78165 (uint32)
+  usb: {...}
+task_timers_armed: False (bool)
+task_times:
+  control_loop_checks: {...}
+  control_loop_misc: {...}
+  current_sense_wait: {...}
+  dc_calib_wait: {...}
+  encoder_update: {...}
+  sampling: {...}
+test_function(delta: int32) -> cnt: int32
+test_property: 0 (uint32)
+thermistor0: 31.709197998046875 (float)
+thermistor1: 31.831573486328125 (float)
+user_config_loaded: 5491 (uint32)
+vbus_voltage: 20.50457191467285 (float)

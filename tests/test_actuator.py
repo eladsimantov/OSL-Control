@@ -12,13 +12,13 @@ from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 
 
 
-def test_actuator():
+def test_position_control():
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
     can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
     knee = ODriveMotor(can1, name="knee", gear_ratio=40)
-    knee.calibrate(15)
+    knee.calibrate(10)
     knee.idle()
-    print("\n Position Copntrol Example \n")
+    print("\n Position Control Example \n")
     knee.closed_loop()
     time.sleep(3)
     knee.position_deg(0)
@@ -26,11 +26,28 @@ def test_actuator():
     print("\n ------------------------ \n")
     knee.idle()
 
+def test_velocity_control():
+    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
+    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
+    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+    knee.calibrate(10)
+    knee.idle()
+    print("\n Velocity Control Example \n")
+    knee.closed_loop()
+    time.sleep(3)
+    knee.velocity_deg_s(1)
+    
+    time.sleep(10)
+    print("\n ------------------------ \n")
+    knee.idle()
 
 if __name__ == "__main__":
     CAN_CH = 'can0'
     BITRATE = 1000000  # Default is 1Mb/s 
-
+    os.system(f"source /home/enable-lab/Desktop/OSL-Control/.venv/bin/activate")
     os.system(f"sudo ip link set {CAN_CH} down")
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
-    test_actuator()
+    test_position_control()
+    test_velocity_control()
+    # test_torque_control()
+    

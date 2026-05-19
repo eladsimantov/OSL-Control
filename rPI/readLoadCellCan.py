@@ -3,7 +3,7 @@ import can
 import struct
 import time
 
-# --- Configuration ---
+# --- Configurat2ion ---
 CAN_CH = 'can1'
 BITRATE = 1000000  # Default is 1Mb/s 
 ID_QUERY = 0x80    # ID #1: Master to Sensor [cite: 483]
@@ -17,6 +17,7 @@ def setup_can():
     os.system(f"sudo ip link set {CAN_CH} down")
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
     return can.interface.Bus(channel=CAN_CH, bustype='socketcan')
+
 
 def main():
     bus = setup_can()
