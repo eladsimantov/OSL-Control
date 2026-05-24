@@ -166,7 +166,7 @@ class ODriveMotor:
         mname,sname,turns =self._read_current_turns()
         if turns is not None:
             self.degrees = 360* (turns / self.gear_ratio)
-            print (self.degrees)
+            # print (self.degrees)
         return self.degrees
         
     def follow_position(self,stop_time=30):
@@ -251,8 +251,8 @@ class ODriveMotor:
         try:
             self.can.send_dbc("Axis0_Set_Input_Pos", {
                 "Input_Pos": float(target_turns),
-                "Vel_FF": 5.0,
-                "Torque_FF": 1.0
+                "Vel_FF": 0.0,
+                "Torque_FF": 0.0
             })
             print(f"{self.name} -> pos cmd: target_turns={target_turns:.6f} (src={debug_src})")
         except Exception:
@@ -265,7 +265,7 @@ class ODriveMotor:
         try:
             self.can.send_dbc("Axis0_Set_Input_Vel", {
                 "Input_Vel": turns_s,
-                "Input_Torque_FF": 1.0
+                "Input_Torque_FF": 0.0
             })
         except Exception:
             self.alive = False
@@ -288,7 +288,7 @@ class ODriveMotor:
         start_time = 0
         current_time = 0
         last_time = 0
-        desired_dt = 0.01 # seconds
+        desired_dt = 0.001 # seconds
         last_position = 0
         start_time= time.time()
 
