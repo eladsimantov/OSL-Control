@@ -14,7 +14,7 @@ import os
 # ===========================================================
 
 class ODriveCAN:
-    def __init__(self, bus_name="can0", node_id=1, dbc_path="/home/enable-lab/OSL-Control/src/drivers/odrive-cansimple.dbc"):
+    def __init__(self, bus_name="can0", node_id=1, dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"):
         self.node_id = node_id
         self.axisID = node_id
         # open CAN and DBC
@@ -180,16 +180,19 @@ class ODriveMotor:
     
 
     #current reading is not working right now
+
     def read_current(self):
-        candidates = ["iq_measured", "motor_current", "current"]
+        candidates = ["Iq_Measured", "motor_current", "current"]
         mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
         if val is None:
+            print("something wrong with current reading")
             return  None
         try:
             v = float(val)
             print (f"Current reading: {v} A")
             return  v
         except Exception:
+            print("different somehing is wrong with current reading")
             return  None
         
     def follow_current(self,stop_time=20):
@@ -248,7 +251,7 @@ class ODriveMotor:
         try:
             self.can.send_dbc("Axis0_Set_Input_Pos", {
                 "Input_Pos": float(target_turns),
-                "Vel_FF": 30.0,
+                "Vel_FF": 5.0,
                 "Torque_FF": 1.0
             })
             print(f"{self.name} -> pos cmd: target_turns={target_turns:.6f} (src={debug_src})")
@@ -280,7 +283,7 @@ class ODriveMotor:
             self.alive = False
 
     #this function cant work without torque measurments
-    def impedance_control(self, kp=0.1, kd=0.1, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0):
+    def impedance_control(self, kp=0.01, kd=0.0, pos_eq_deg=30.0, stop_time=5,torque_eq_nm=0):
         
         start_time = 0
         current_time = 0
@@ -298,8 +301,9 @@ class ODriveMotor:
             #not right 
                 try:
                     Current_position = self.read_position()
+                    Current_velocity = self.get_velocity()
                     #option 1 for velocity measurement: numerical differentiation
-                    Current_velocity = (Current_position-last_position)/desired_dt
+                    #Current_velocity = (Current_position-last_position)/desired_dt
                     # need to find a way to read velocity
                     last_position = Current_position
                     print(f"Current position: {Current_position} deg")
@@ -445,7 +449,7 @@ class ODriveMotor:
                     else:
                         turns = v
                         note = "turns"
-                    deg = turns * 360.0 / self.gear_ratio
+                    deg = turns * 360.0 / sel10f.gear_ratio
                     print(f"{self.name} [{mname}.{sname}] raw={v} ({note}) -> {deg:.2f} deg (home {self._home_deg:.2f})")
                 except Exception:
                     print(f"{self.name} [{mname}.{sname}] = {val}")
