@@ -146,6 +146,12 @@ def test_impedance_control(actuator, duration=5.0, dt=0.01):
 
 # ─── Main ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # Raspberry Pi settings for can bus communications to motor
+    CAN_CH = 'can0'
+    BITRATE = 1000000  # Default is 1Mb/s 
+    os.system(f"sudo ip link set {CAN_CH} down")
+    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
+
     import argparse
 
     parser = argparse.ArgumentParser(description="ODriveActuator adapter test")
