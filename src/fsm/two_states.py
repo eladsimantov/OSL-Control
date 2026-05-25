@@ -11,6 +11,7 @@ if project_path not in sys.path:
 
 from opensourceleg.control.fsm import State, StateMachine
 from opensourceleg.utilities import SoftRealtimeLoop
+from opensourceleg.logging import LOGGER, LogLevel
 from src.drivers.odrive_can import ODriveCAN
 from src.adapters.actuator import ODriveActuator
 from src.adapters.loadcell import SRILoadCell_M8123B2
@@ -58,22 +59,23 @@ class TwoStatesFSM:
         self.stance_knee_angle_rad = math.radians(self.stance_knee_angle)
         self.peak_flexion_angle_rad = math.radians(self.peak_flexion_angle)
 
-        print(f"--- Starting Two-States Gait FSM (Offline={self.offline}) ---")
-        print(f"Parameters:\n  Unload Thr: {self.unload_threshold}N | Load Thr: {self.load_threshold}N")
-        print(f"  Stance Ang: {self.stance_knee_angle}° | Swing Peak: {self.peak_flexion_angle}° in {self.peak_flexion_time}s")
+        LOGGER.set_stream_level(LogLevel.DEBUG)
+        LOGGER.info(f"--- Starting Two-States Gait FSM (Offline={self.offline}) ---")
+        LOGGER.info(f"Parameters:\n  Unload Thr: {self.unload_threshold}N | Load Thr: {self.load_threshold}N")
+        LOGGER.info(f"  Stance Ang: {self.stance_knee_angle}° | Swing Peak: {self.peak_flexion_angle}° in {self.peak_flexion_time}s")
 
         # 1. Initialize CAN bus (if online) and adapters
         if self.offline:
             can_bus = None
         else:
             try:
-                print(f"Initializing ODrive CAN on {can_interface_odrive}...")
+                LOGGER.info(f"Initializing ODrive CAN on {can_interface_odrive}...")
                 # Resolve DBC path dynamically relative to the driver file location
                 dir_path = os.path.dirname(os.path.abspath(__file__))
                 dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
                 can_bus = ODriveCAN(bus_name=can_interface_odrive, node_id=node_id_odrive, dbc_path=dbc_path)
             except Exception as e:
-                print(f"Failed to connect to ODrive: {e}. Switching to offline.")
+                LOGGER.error(f"Failed to connect to ODrive: {e}. Switching to offline.")
                 can_bus = None
                 self.offline = True
 
@@ -97,7 +99,7 @@ class TwoStatesFSM:
         # 2. Define FSM States
         # State: CALIBRATING
         def enter_calibrating(*args, **kwargs):
-            print("[FSM STATE] -> CALIBRATING: Initiating motor calibration...")
+            LOGGER.info("[FSM STATE] -> CALIBRATING: Initiating motor calibration...")
             if not self.knee.is_offline:
                 self.knee.driver.set_state(3)
 
@@ -108,7 +110,7 @@ class TwoStatesFSM:
 
         # State: STANCE
         def enter_stance(*args, **kwargs):
-            print("[FSM STATE] -> STANCE: Weight support active.")
+            LOGGER.info("[FSM STATE] -> STANCE: Weight support active.")
             self.knee.home()
             self.knee.start()
 
@@ -119,7 +121,7 @@ class TwoStatesFSM:
 
         # State: SWING
         def enter_swing(*args, **kwargs):
-            print("[FSM STATE] -> SWING: Flexion trajectory initiated.")
+            LOGGER.info("[FSM STATE] -> SWING: Flexion trajectory initiated.")
 
         self.swing_state = State(
             name="SWING",
@@ -128,7 +130,7 @@ class TwoStatesFSM:
 
         # State: IDLE
         def enter_idle(*args, **kwargs):
-            print("[FSM STATE] -> IDLE: Motor entered idle state.")
+            LOGGER.info("[FSM STATE] -> IDLE: Motor entered idle state.")
             self.knee.stop()
 
         self.idle_state = State(
@@ -177,7 +179,17 @@ class TwoStatesFSM:
             criteria=swing_to_stance_criteria
         )
 
-        # 5. Execute FSM inside SoftRealtimeLoop
+        # 5. Configure real-time telemetry log
+        LOGGER.set_csv_logging(True)
+        LOGGER.set_file_name("two_states_gait_session")
+        LOGGER.set_buffer_size(50)
+        
+        # Track knee and loadcell variables
+        LOGGER.track_attributes(self.knee, ["motor_position", "motor_velocity", "motor_current"])
+        LOGGER.track_attributes(self.loadcell, ["fz"])
+        LOGGER.track_function(lambda: self.sm.current_state.name, "state")
+
+        # 6. Execute FSM inside SoftRealtimeLoop
         self.loop_dt = 1.0 / self.loop_hz
         self.clock = SoftRealtimeLoop(dt=self.loop_dt, report=True)
         
@@ -189,7 +201,7 @@ class TwoStatesFSM:
 
         # Stop iteration if max duration is reached
         if self.max_duration is not None and t >= self.max_duration:
-            print(f"Max duration of {self.max_duration}s reached. Stopping FSM loop.")
+            LOGGER.info(f"Max duration of {self.max_duration}s reached. Stopping FSM loop.")
             return 0
 
         current_state_obj = self.sm.current_state
@@ -246,27 +258,29 @@ class TwoStatesFSM:
             
             self.knee.set_motor_position(target_ang)
 
-        # Periodic prints
+        # Update telemetry data buffer
+        LOGGER.update()
+
+        # Periodic prints (LOGGER.debug is safe for loop prints)
         if int(t * 10) % 20 == 0:
             pos_deg = math.degrees(self.knee.motor_position)
-            print(f"Time: {t:.2f}s | State: {self.sm.current_state.name} ({state_time:.2f}s) | Fz: {fz_val:.1f}N")
-            print(f"Knee Position: {pos_deg:.2f}°")
+            LOGGER.debug(f"Time: {t:.2f}s | State: {self.sm.current_state.name} ({state_time:.2f}s) | Fz: {fz_val:.1f}N | Knee Position: {pos_deg:.2f}°")
 
         return 1
 
     def run(self):
-        print("Two-states FSM setup complete. Starting gait loop...")
+        LOGGER.info("Two-states FSM setup complete. Starting gait loop...")
         try:
             with self.sm:
                 self.clock.run(self.update)
         except KeyboardInterrupt:
-            print("\nKeyboardInterrupt detected. Shutting down cleanly...")
+            LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
         finally:
             self.cleanup()
 
     def cleanup(self):
         # Graceful cleanup
-        print("Cleaning up ODrive and shutting down sensors...")
+        LOGGER.info("Cleaning up ODrive and shutting down sensors...")
         try:
             self.knee.stop()
         except Exception:
@@ -280,8 +294,9 @@ class TwoStatesFSM:
                 self.knee.driver.can.bus.shutdown()
             except Exception:
                 pass
+        LOGGER.close()
         self.clock.stop()
-        print("Shutdown complete.")
+        LOGGER.info("Shutdown complete.")
 
 
 def run_two_states_fsm(offline: bool = None, max_duration: float = None):

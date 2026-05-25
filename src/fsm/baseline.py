@@ -11,6 +11,7 @@ if project_path not in sys.path:
 
 from opensourceleg.control.fsm import State, StateMachine
 from opensourceleg.utilities import SoftRealtimeLoop
+from opensourceleg.logging import LOGGER, LogLevel
 from src.drivers.odrive_can import ODriveCAN
 from src.adapters.actuator import ODriveActuator
 
@@ -36,20 +37,21 @@ class BaselineFSM:
         self.loop_hz = self.config["loop_hz"]
         self.calibrate_time = self.config["calibrate_time"]
 
-        print(f"--- Starting Baseline FSM (Offline={self.offline}) ---")
+        LOGGER.set_stream_level(LogLevel.DEBUG)
+        LOGGER.info(f"--- Starting Baseline FSM (Offline={self.offline}) ---")
 
         # 1. Initialize CAN Bus (if online) and Actuator Adapter
         if self.offline:
             can_bus = None
         else:
             try:
-                print(f"Initializing CAN interface {can_interface}...")
+                LOGGER.info(f"Initializing CAN interface {can_interface}...")
                 # Resolve DBC path dynamically relative to the driver file location
                 dir_path = os.path.dirname(os.path.abspath(__file__))
                 dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
                 can_bus = ODriveCAN(bus_name=can_interface, node_id=node_id, dbc_path=dbc_path)
             except Exception as e:
-                print(f"Failed to connect to hardware CAN: {e}. Switching to offline mode.")
+                LOGGER.error(f"Failed to connect to hardware CAN: {e}. Switching to offline mode.")
                 can_bus = None
                 self.offline = True
 
@@ -64,7 +66,7 @@ class BaselineFSM:
         # 2. Define FSM States
         # State: CALIBRATING
         def enter_calibrating(*args, **kwargs):
-            print("[FSM STATE] -> CALIBRATING: Initiating motor calibration...")
+            LOGGER.info("[FSM STATE] -> CALIBRATING: Initiating motor calibration...")
             # For ODriveMotor driver calibration mode:
             if not self.knee.is_offline:
                 self.knee.driver.set_state(3)
@@ -76,7 +78,7 @@ class BaselineFSM:
 
         # State: HOLDING
         def enter_holding(*args, **kwargs):
-            print("[FSM STATE] -> HOLDING: Closed-loop control active.")
+            LOGGER.info("[FSM STATE] -> HOLDING: Closed-loop control active.")
             self.knee.home()
             self.knee.start()
 
@@ -87,7 +89,7 @@ class BaselineFSM:
 
         # State: IDLE
         def enter_idle(*args, **kwargs):
-            print("[FSM STATE] -> IDLE: Motor entering idle state.")
+            LOGGER.info("[FSM STATE] -> IDLE: Motor entering idle state.")
             self.knee.stop()
 
         self.idle_state = State(
@@ -111,7 +113,16 @@ class BaselineFSM:
             criteria=calibration_criteria
         )
 
-        # 5. Execute FSM in SoftRealtimeLoop
+        # 5. Configure real-time telemetry log
+        LOGGER.set_csv_logging(True)
+        LOGGER.set_file_name("baseline_gait_session")
+        LOGGER.set_buffer_size(50)
+        
+        # Track knee properties and current state
+        LOGGER.track_attributes(self.knee, ["motor_position", "motor_velocity", "motor_current"])
+        LOGGER.track_function(lambda: self.sm.current_state.name, "state")
+
+        # 6. Execute FSM in SoftRealtimeLoop
         self.loop_dt = 1.0 / self.loop_hz
         self.clock = SoftRealtimeLoop(dt=self.loop_dt, report=True)
 
@@ -120,7 +131,7 @@ class BaselineFSM:
 
         # Stop iteration if max duration is reached
         if self.max_duration is not None and t >= self.max_duration:
-            print(f"Max duration of {self.max_duration}s reached. Stopping FSM loop.")
+            LOGGER.info(f"Max duration of {self.max_duration}s reached. Stopping FSM loop.")
             return 0
 
         # Update current state's internal variables
@@ -133,28 +144,30 @@ class BaselineFSM:
         if self.sm.current_state == self.holding_state:
             # Keep commanding 0 radians (absolute position control at home angle)
             self.knee.set_motor_position(0.0)
+
+        # Log current variable states to RAM buffer
+        LOGGER.update()
         
-        # Print status info periodically
+        # Print status info periodically (LOGGER.debug is safe for loop prints)
         if int(t * 10) % 20 == 0:
             pos_deg = math.degrees(self.knee.motor_position)
-            print(f"Time: {t:.2f}s | Current State: {self.sm.current_state.name} | State Time: {state_time:.1f}s")
-            print(f"Knee Position: {pos_deg:.2f}°")
+            LOGGER.debug(f"Time: {t:.2f}s | Current State: {self.sm.current_state.name} | State Time: {state_time:.1f}s | Knee Position: {pos_deg:.2f}°")
             
         return 1
 
     def run(self):
-        print("FSM setup complete. Starting real-time control loop...")
+        LOGGER.info("FSM setup complete. Starting real-time control loop...")
         try:
             with self.sm:
                 self.clock.run(self.update)
         except KeyboardInterrupt:
-            print("\nKeyboardInterrupt detected. Shutting down cleanly...")
+            LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
         finally:
             self.cleanup()
 
     def cleanup(self):
         # Graceful cleanup
-        print("Cleaning up ODrive and shutting down CAN...")
+        LOGGER.info("Cleaning up ODrive and shutting down CAN...")
         try:
             self.knee.stop()
         except Exception:
@@ -164,8 +177,9 @@ class BaselineFSM:
                 self.knee.driver.can.bus.shutdown()
             except Exception:
                 pass
+        LOGGER.close()
         self.clock.stop()
-        print("Shutdown complete.")
+        LOGGER.info("Shutdown complete.")
 
 
 def run_baseline_fsm(offline: bool = None, max_duration: float = None):
