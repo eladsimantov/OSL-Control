@@ -28,11 +28,9 @@ class ODriveActuator(ActuatorBase):
     """
     Impelementation of the OSL actuators class based on Odrive drivers and can interface.
     """
-    # TODO: Add actual implementation of methods to interface with ODrive motors via CAN.
-    # We may need to override ODriveMotor class as it is unnecessary middleware.
     def __init__(
         self, 
-        can_interface: ODriveCAN, 
+        can_interface: Optional[ODriveCAN], 
         tag: str, 
         gear_ratio: float = 1.0, 
         motor_constants = MOTOR_CONSTANTS(
@@ -44,67 +42,169 @@ class ODriveActuator(ActuatorBase):
              MAX_WINDING_TEMPERATURE=120.0
             ),
         frequency: int = 1000,
+        offline: bool = False,
         **kwargs
     ):
 
-        # 2. Initialize Base Class
+        # 1. Initialize Base Class
         super().__init__(
             tag=tag,
             gear_ratio=gear_ratio,
             motor_constants=motor_constants,
             frequency=frequency,
+            offline=offline,
             **kwargs
         )
 
-        # 3. Initialize Hardware Driver
-        self.driver = ODriveMotor(can_interface, gear_ratio = 1, name=tag)
+        self._mock_pos = 0.0
+        self._is_homed = False
+        self._is_streaming = False
+
+        # 2. Initialize Hardware Driver if online
+        if not self.is_offline:
+            if can_interface is None:
+                raise ValueError("can_interface must be provided when offline=False")
+            self.driver = ODriveMotor(can_interface, gear_ratio=gear_ratio, name=tag)
+        else:
+            self.driver = None
         
         
     @property
     def _CONTROL_MODE_CONFIGS(self):
         return CONTROL_MODE_CONFIGS()
     def start(self):
-        print("Started")
+        if self.is_offline:
+            print(f"[Offline Mock {self.tag}] Closed loop active.")
+            self._is_streaming = True
+            return
+        
+        self.driver.closed_loop()
+        self._is_streaming = True
+
     def stop(self):
-        print("Stopped")
+        if self.is_offline:
+            print(f"[Offline Mock {self.tag}] Motor idled.")
+            self._is_streaming = False
+            return
+        
+        self.driver.idle()
+        self._is_streaming = False
+
     def update(self):
-        print("Updated")
-    def set_motor_voltage(self, value: float) -> None:
-        print(f"MotoODriveActuatorr voltage set to {value}")
-    def set_motor_current(self, value: float) -> None:
-        print(f"Motor current set to {value}")
+        pass
+
     def set_motor_position(self, value: float) -> None:
-        print(f"Motor position set to {value}")
+        """Set target position in radians (absolute)."""
+        if self.is_offline:
+            self._mock_pos = value
+            print(f"[Offline Mock {self.tag}] Target position: {math.degrees(value):.2f}°")
+            return
+        
+        # Convert radians to output degrees
+        deg = math.degrees(value)
+        self.driver.position_deg(deg, absolute=True)
+
     def set_motor_torque(self, value: float) -> None:
-        print(f"Motor torque set to {value}")
+        """Set target torque in Nm."""
+        if self.is_offline:
+            print(f"[Offline Mock {self.tag}] Target torque: {value:.2f} Nm")
+            return
+        
+        self.driver.torque_nm(value)
+
+    def set_motor_current(self, value: float) -> None:
+        """Set max current limit in Amps."""
+        if self.is_offline:
+            print(f"[Offline Mock {self.tag}] Target current limit: {value:.2f} A")
+            return
+        
+        self.driver.set_limit_current(value)
+
+    def set_motor_voltage(self, value: float) -> None:
+        pass
+
     def set_output_torque(self, value: float) -> None:
-        print(f"Output torque set to {value}")
+        self.set_motor_torque(value / self.gear_ratio)
+
     def set_current_gains(self, kp: float, ki: float, kd: float, ff: float) -> None:
-        print("Current gains set")
+        pass
+
     def set_position_gains(self, kp: float, ki: float, kd: float, ff: float) -> None:
-        print("Position gains set")
+        pass
+
     def _set_impedance_gains(self, k: float, b: float) -> None:
-        print("Impedance gains set")
+        pass
+
     def home(self) -> None:
-        print("Homed")
+        if self.is_offline:
+            self._mock_pos = 0.0
+            self._is_homed = True
+            print(f"[Offline Mock {self.tag}] Homing complete.")
+            return
+
+        # Perform zero-jump homing
+        mname, sname, turns = self.driver._read_current_turns()
+        if turns is not None:
+            self.driver.can.send_dbc("Axis0_Set_Input_Pos", {
+                "Input_Pos": float(turns),
+                "Vel_FF": 0.0,
+                "Torque_FF": 0.0
+            })
+            self.driver._home_deg = (turns / self.driver.gear_ratio) * 360.0
+            print(f"[{self.tag}] Homed ODrive to: {self.driver._home_deg:.2f} degrees")
+        else:
+            self.driver._home_deg = 0.0
+            print(f"[{self.tag}] Warning: Could not read encoder turns, default homing to 0.0")
+        
+        self._is_homed = True
+
     @property
     def motor_position(self) -> float:
-        return 100.0
+        """Returns the motor position in radians."""
+        if self.is_offline:
+            return self._mock_pos
+        
+        mname, sname, turns = self.driver._read_current_turns()
+        if turns is None:
+            turns = 0.0
+        return float(turns * 2.0 * math.pi)
+
     @property
     def motor_velocity(self) -> float:
-        return 10.0
+        """Returns the motor velocity in radians per second."""
+        if self.is_offline:
+            return 0.0
+        
+        candidates = ["vel_estimate", "velocity", "encoder_vel", "velocity_estimate"]
+        mname, sname, val = self.driver.can.find_signal(self.driver.can.axisID, candidates)
+        if val is None:
+            return 0.0
+        try:
+            turns_s = float(val)
+            return float(turns_s * 2.0 * math.pi)
+        except Exception:
+            return 0.0
+
     @property
     def motor_voltage(self) -> float:
         return 24.0
+
     @property
     def motor_current(self) -> float:
-        return 0.5
+        if self.is_offline:
+            return 0.0
+        current = self.driver.read_current()
+        return float(current) if current is not None else 0.0
+
     @property
     def motor_torque(self) -> float:
-        return 2.0
+        return self.motor_current * self.MOTOR_CONSTANTS.NM_PER_AMP
+
     @property
     def case_temperature(self) -> float:
-        return 70.0
+        return 35.0
+
     @property
     def winding_temperature(self) -> float:
-        return 90.0
+        return 40.0
+
