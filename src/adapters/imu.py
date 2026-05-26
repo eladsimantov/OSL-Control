@@ -64,8 +64,7 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
             return
             
         self._acc_data = list(self._adafruit_imu.acceleration)
-        self._gyro_data = list(self._adafruit_imu.gyro)
-        self._euler_data = list(self._adafruit_imu.euler)
+        self._gyro_data = list(self._adafruit_imu.gyro)        
 
     @property
     def data(self) -> dict[str, Any]:
