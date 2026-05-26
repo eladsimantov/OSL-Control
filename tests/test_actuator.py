@@ -17,15 +17,20 @@ def test_position_control():
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
     can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
     knee = ODriveMotor(can1, name="knee", gear_ratio=40)
-    knee.calibrate(10)
+    
     knee.idle()
     print("\n Position Control Example \n")
     knee.closed_loop()
-    knee.set_limit_current(10,10)
-    time.sleep(3)
-    knee.position_deg(0)
+    knee.set_limit_current(10,15)
+    time.sleep(10)
+    knee.position_deg(5)
     time.sleep(2)
+    knee.position_deg(45)
+    time.sleep(10)
+    knee.get_velocity()
     knee.read_position()
+    knee.read_current()
+    knee.get_velocity()
     time.sleep(10)
     print("\n ------------------------ \n")
     knee.idle()
@@ -46,7 +51,7 @@ def test_velocity_control():
     print("\n ------------------------ \n")
     knee.idle()
 
-def test_torque_control():
+def test_torque_control(tau_command=0.2):
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
     can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
     knee = ODriveMotor(can1, name="knee", gear_ratio=40)
@@ -56,7 +61,7 @@ def test_torque_control():
     knee.closed_loop()
     time.sleep(3)
     knee.set_limit_current(max_current=10, max_velocity=30)
-    knee.torque_nm(0.2)
+    knee.torque_nm(tau_command)
     knee.follow_current()
 
     
@@ -70,14 +75,13 @@ def test_impedance_control():
     # knee.calibrate(10)
     knee.idle()
     print("\n Impedance Control Example \n")
-    knee.set_limit_current(10,10)
+    knee.set_limit_current(10,30)
     knee.closed_loop()
     time.sleep(3)
     
     #for refrence: impedance_control(self, kp=0.1, kd=0, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0)
-    knee.impedance_control()
+    knee.impedance_control(kp=0.025, kd=0.00005,pos_eq_deg=25,stop_time=20)
     
-    time.sleep(20)
     print("\n ------------------------ \n")
     knee.idle()
 
@@ -112,6 +116,6 @@ if __name__ == "__main__":
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
     # test_position_control()
     # test_velocity_control()
-    #test_torque_control()
+    # test_torque_control(0.2)
     # test_sine_movement()
     test_impedance_control()

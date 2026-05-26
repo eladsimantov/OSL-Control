@@ -123,7 +123,7 @@ class SRILoadCell_M8123B2(LoadcellBase):
     def calibrate(self, n_samples: int = 2000) -> None:
         """Perform a software zeroing routine by averaging samples."""
         LOGGER.info(f"[{self.tag}] Starting zeroing routine. Ensure the sensor is unloaded.")
-        input("Press Enter to start...")
+        #input("Press Enter to start...")
         
         samples = []
         for _ in range(n_samples):

@@ -21,7 +21,7 @@ sys.path.insert(0, project_path)
 from src.drivers.odrive_can import ODriveMotor
 from src.drivers.odrive_can import ODriveCAN
 
-# os.system("sudo ip link set can0 up type can bitrate 250000")
+os.system("sudo ip link set can0 up type can bitrate 1000000")
 
 #probably we need the second class also, maybe even the third 
 #we want to move to one command for initiation, not 2 or more 
