@@ -116,10 +116,10 @@ if __name__ == "__main__":
     os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
 
     try:
-        test_position_control(knee)
-        test_velocity_control(knee)
-        test_torque_control(knee)
-        test_sine_movement(knee)
+        # test_position_control(knee)
+        # test_velocity_control(knee)
+        # test_torque_control(knee)
+        # test_sine_movement(knee)
         test_impedance_control(knee)
     
     except KeyboardInterrupt:

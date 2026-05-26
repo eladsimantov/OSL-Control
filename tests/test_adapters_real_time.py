@@ -15,7 +15,6 @@ project_path = os.path.join(tests_path, "..")
 sys.path.insert(0, project_path)
 from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 # from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
-from tests.test_actuator import test_impedance_control
 # from src.adapters.imu import IMUAdapter
 # from opensourceleg.sensors.imu import BNO055
 from src.adapters.loadcell import SRILoadCell_M8123B2
@@ -30,28 +29,42 @@ if __name__ == "__main__":
     BITRATE = 1000000  # Default is 1Mb/s 
     can1 = ODriveCAN(node_id=motor_node_id,dbc_path=dbc_path,bus_name=CAN_CH)
     knee = ODriveMotor(can1, name="knee", gear_ratio=40) 
-    knee.idle()
 
+    # USB2CAN adapter settings
+    os.system(f"sudo ip link set {CAN_CH} down")
+    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE} sample-point 0.750")
+    os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
+
+    knee.idle()
+    knee.closed_loop()
+    
     loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel=CAN_CH)
     loadcell.start()
     loadcell.calibrate()
 
     loop = SoftRealtimeLoop(dt=0.01)
-    for t in loop:
-        print("\n Impedance Control Example \n")
-        knee.set_limit_current(10,30)
-        knee.closed_loop()
-    
-        knee.impedance_control(kp=0.025, kd=0.00005,pos_eq_deg=25,stop_time=20)
-        loadcell.update()     
-        # Print Force (N) and Moments (Nm)
-        # Moments use properties mx, my, mz from your class
-        print(f"F(xyz) N: [{loadcell.fx:6.2f}, {loadcell.fy:6.2f}, {loadcell.fz:6.2f}] | "
-                f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\n')
+    try: 
+        for t in loop:
+            print("\n Torque Control Example \n")
+            knee.set_limit_current(10,30)
+            knee.closed_loop()
+        
+            knee.torque_nm(0.15)
+            loadcell.update()     
+            if t>=10:
+                print(f"F(xyz) N: [{loadcell.fx:6.2f}, {loadcell.fy:6.2f}, {loadcell.fz:6.2f}] | "
+                        f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\n')
 
-        if t >= 20:
-            loop.stop()
+            if t >= 5:
+                knee.idle()
+                os.system(f"sudo ip link set {CAN_CH} down")    
+                loop.stop()
 
+    except KeyboardInterrupt:
+        print("Stopping loop and moving Knee to Idle mode")
+        knee.idle()    
+        os.system(f"sudo ip link set {CAN_CH} down")    
+        
     # thighIMU= BNO055(tag="Timu", addr=40, offline=False)
     # thighIMU = IMUAdapter(tag="Timu", address=40, offline=True)
     # from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
