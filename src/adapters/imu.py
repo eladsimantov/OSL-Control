@@ -25,6 +25,7 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
         self._address = addr
         self._gyro_data = [0.0, 0.0, 0.0]
         self._acc_data = [0.0, 0.0, 0.0]
+        self._euler_data = [0.0, 0.0, 0.0]
         self._is_streaming = False
         self._adafruit_imu = None
 
@@ -64,12 +65,14 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
             
         self._acc_data = list(self._adafruit_imu.acceleration)
         self._gyro_data = list(self._adafruit_imu.gyro)
+        self._euler_data = list(self._adafruit_imu.euler)
 
     @property
     def data(self) -> dict[str, Any]:
         return {
             "acc": self._acc_data,
-            "gyro": self._gyro_data
+            "gyro": self._gyro_data,
+            "euler": self._euler_data
         }
 
     # API Properties for OSL compatibility
@@ -85,6 +88,12 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
     def gyro_y(self) -> float: return self._gyro_data[1]
     @property
     def gyro_z(self) -> float: return self._gyro_data[2]
+    @property
+    def euler_x(self) -> float: return self._euler_data[0]
+    @property
+    def euler_y(self) -> float: return self._euler_data[1]
+    @property
+    def euler_z(self) -> float: return self._euler_data[2]
     
     @property
     def is_streaming(self) -> bool: return self._is_streaming
