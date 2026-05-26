@@ -13,24 +13,46 @@ import sys
 tests_path = os.path.dirname(os.path.abspath(__file__))
 project_path = os.path.join(tests_path, "..")
 sys.path.insert(0, project_path)
-from src.drivers.odrive_can import ODriveMotor, ODriveCAN
-from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
-from src.adapters.actuator import ODriveActuator
+from src.drivers.odrive_can import ODriveCAN, ODriveMotor
+# from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
+from tests.test_actuator import test_impedance_control
+# from src.adapters.imu import IMUAdapter
+# from opensourceleg.sensors.imu import BNO055
+from src.adapters.loadcell import SRILoadCell_M8123B2
 
-from src.adapters.imu import IMUAdapter
-from opensourceleg.sensors.imu import BNO055
+from opensourceleg.utilities import SoftRealtimeLoop
+
 
 if __name__ == "__main__":
-    # can1 = ODriveCAN(node_id=1)
-    # kneeActuator = ODriveActuator(
-    #             tag="act1",
-    #             can_interface=can1,
-    #             gear_ratio=100,
-    #             motor_constants=MOTOR_CONSTANTS(2048, 0.02, 0.001, 0.0001, 80.0, 120.0)
-    # )
-    # TODO: add test cases based on the examples.
-    print(".")
-    thighIMU= BNO055(tag="Timu", addr=40, offline=False)
+    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
+    motor_node_id = 0
+    CAN_CH = 'can2'
+    BITRATE = 1000000  # Default is 1Mb/s 
+    can1 = ODriveCAN(node_id=motor_node_id,dbc_path=dbc_path,bus_name=CAN_CH)
+    knee = ODriveMotor(can1, name="knee", gear_ratio=40) 
+    knee.idle()
+
+    loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel=CAN_CH)
+    loadcell.start()
+    loadcell.calibrate()
+
+    loop = SoftRealtimeLoop(dt=0.01)
+    for t in loop:
+        print("\n Impedance Control Example \n")
+        knee.set_limit_current(10,30)
+        knee.closed_loop()
+    
+        knee.impedance_control(kp=0.025, kd=0.00005,pos_eq_deg=25,stop_time=20)
+        loadcell.update()     
+        # Print Force (N) and Moments (Nm)
+        # Moments use properties mx, my, mz from your class
+        print(f"F(xyz) N: [{loadcell.fx:6.2f}, {loadcell.fy:6.2f}, {loadcell.fz:6.2f}] | "
+                f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\n')
+
+        if t >= 20:
+            loop.stop()
+
+    # thighIMU= BNO055(tag="Timu", addr=40, offline=False)
     # thighIMU = IMUAdapter(tag="Timu", address=40, offline=True)
     # from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
     # from src.drivers.odrive_can import ODriveMotor, ODriveCAN
@@ -43,13 +65,10 @@ if __name__ == "__main__":
     #             gear_ratio=100,
     #             motor_constants=MOTOR_CONSTANTS(2048, 0.02, 0.001, 0.0001, 80.0, 120.0)
     # )
-    # loadcell = SRILoadCell_M8123B2(
-    #     tag="loadcell1",
-    #     calibration_matrix = np.eye(6),  # Placeholder, should be replaced with actual calibration matrix
-    #     amp_gain=125.0,
-    #     exc=5.0,
-    #     bus=1
-    # )
+
+
+
+
     # imu = BNO055(tag="imu1", bus=1, address=0x28)
     # encoder = AS5048B(tag="encoder1", bus=1, address=0x40)
 
