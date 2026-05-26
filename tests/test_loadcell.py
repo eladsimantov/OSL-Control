@@ -10,6 +10,26 @@ import time
 
 from src.adapters.loadcell import SRILoadCell_M8123B2
 
+
+def setup_can():
+    # --- Configurat2ion ---
+    CAN_CH = 'can2'
+    BITRATE = 1000000  # Default is 1Mb/s 
+    ID_QUERY = 0x80    # ID #1: Master to Sensor [cite: 483]
+    ID_REPLY = [0x291, 0x292, 0x293] # IDs #2, #3, #4 [cite: 485, 487, 489]
+
+    # CRATE, CFIDL and CTXIDL
+    # # CAN SHIELD SETTINGS
+    # os.system(f"sudo ip link set {CAN_CH} down")
+    # os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
+
+    # USB2CAN adapter settings
+    os.system(f"sudo ip link set {CAN_CH} down")
+    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE} sample-point 0.750")
+    os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
+
+    return 
+
 def test_loadcell():
     print("\n" + "="*50)
     print("  SRI M8123B2 ADAPTER TEST (FORCE & MOMENT) ")
@@ -18,7 +38,7 @@ def test_loadcell():
     # 1. Hardware Connection Attempt
     try:
         # Defaulting to online mode (offline=False)
-        loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel="can1")
+        loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel="can2")
         loadcell.start()
         
         # Check if the SocketCAN bus actually opened
@@ -65,4 +85,5 @@ def test_loadcell():
         print("[INFO] Bus closed. Cleanup complete.")
 
 if __name__ == "__main__":
+    setup_can()
     test_loadcell()
