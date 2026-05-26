@@ -30,3 +30,6 @@ toml==0.10.2
 typing_extensions==4.15.0
 tzdata==2025.3
 wrapt==1.17.3
+pyquaternion==0.9.9
+filterpy==1.4.5
+
