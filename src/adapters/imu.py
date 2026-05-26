@@ -26,6 +26,7 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
         self._gyro_data = [0.0, 0.0, 0.0]
         self._acc_data = [0.0, 0.0, 0.0]
         self._euler_data = [0.0, 0.0, 0.0]
+        self._quat_data = [1.0, 0.0, 0.0, 0.0]  # Initialize default identity quaternion
         self._is_streaming = False
         self._adafruit_imu = None
 
@@ -48,9 +49,13 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
             i2c = busio.I2C(board.SCL, board.SDA)
             self._adafruit_imu = adafruit_bno055.BNO055_I2C(i2c, address=self._address)
             
-            # Standard OSL Config
+            # OSL Config: Use IMUPLUS_MODE (accelerometer + gyro fusion) to enable
+            # onboard orientation calculation (Euler angles & Quaternions).
+            # If absolute compass heading is needed, use NDOF_MODE instead.
+            # Avoid NDOF_MODE if close to high-current motor wires to prevent magnetic distortion.
+            # See in the adafruit library all modes and their descriptions in: adafruit_bno055.BNO055
             self._adafruit_imu.use_external_crystal = True
-            self._adafruit_imu.mode = adafruit_bno055.ACCGYRO_MODE
+            self._adafruit_imu.mode = adafruit_bno055.IMUPLUS_MODE
             
             self._is_streaming = True
             LOGGER.info(f"[{self.tag}] Hardware connected and streaming.")
@@ -65,14 +70,23 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
             
         self._acc_data = list(self._adafruit_imu.acceleration)
         self._gyro_data = list(self._adafruit_imu.gyro)
-        self._euler_data = list(self._adafruit_imu.euler)
+        
+        # Read orientation data if available (using value comparison instead of identity is not)
+        euler_val = self._adafruit_imu.euler
+        if euler_val != (None, None, None):
+            self._euler_data = list(euler_val)
+            
+        quat_val = self._adafruit_imu.quaternion
+        if quat_val != (None, None, None, None):
+            self._quat_data = list(quat_val)
 
     @property
     def data(self) -> dict[str, Any]:
         return {
             "acc": self._acc_data,
             "gyro": self._gyro_data,
-            "euler": self._euler_data
+            "euler": self._euler_data,
+            "quat": self._quat_data
         }
 
     # API Properties for OSL compatibility
@@ -94,6 +108,14 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
     def euler_y(self) -> float: return self._euler_data[1]
     @property
     def euler_z(self) -> float: return self._euler_data[2]
+    @property
+    def quat_w(self) -> float: return self._quat_data[0]
+    @property
+    def quat_x(self) -> float: return self._quat_data[1]
+    @property
+    def quat_y(self) -> float: return self._quat_data[2]
+    @property
+    def quat_z(self) -> float: return self._quat_data[3]
     
     @property
     def is_streaming(self) -> bool: return self._is_streaming
