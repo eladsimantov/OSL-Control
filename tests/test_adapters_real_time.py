@@ -56,10 +56,11 @@ if __name__ == "__main__":
             knee.set_torque_nm(0.15)
 
             # Print loadcell data in-place (carriage return avoids scroll overhead)
-            print(f"\r t={t:6.2f}s | "
-                  f"F(xyz) N: [{loadcell.fx:7.2f}, {loadcell.fy:7.2f}, {loadcell.fz:7.2f}] | "
-                  f"M(xyz) Nm: [{loadcell.mx:7.3f}, {loadcell.my:7.3f}, {loadcell.mz:7.3f}] | "
-                  f"CAN rx: {loadcell._last_update_count}", end='   ')
+            if round(t/0.01)%10 == 0:
+                print(f"\r t={t:6.2f}s | "
+                      f"F(xyz) N: [{loadcell.fx:7.2f}, {loadcell.fy:7.2f}, {loadcell.fz:7.2f}] | "
+                      f"M(xyz) Nm: [{loadcell.mx:7.3f}, {loadcell.my:7.3f}, {loadcell.mz:7.3f}] | "
+                      f"CAN rx: {loadcell._last_update_count}", end='   ')
 
     finally:
         # This block ALWAYS runs — whether loop exits via:
