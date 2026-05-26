@@ -449,7 +449,7 @@ class ODriveMotor:
                     else:
                         turns = v
                         note = "turns"
-                    deg = turns * 360.0 / sel10f.gear_ratio
+                    deg = turns * 360.0 / self.gear_ratio
                     print(f"{self.name} [{mname}.{sname}] raw={v} ({note}) -> {deg:.2f} deg (home {self._home_deg:.2f})")
                 except Exception:
                     print(f"{self.name} [{mname}.{sname}] = {val}")
