@@ -13,32 +13,27 @@ from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 # from opensourceleg.actuators import MOTOR_CONSTANTS
 
 
-def test_position_control():
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
-    
+def test_position_control(knee):
     knee.idle()
     print("\n Position Control Example \n")
     knee.closed_loop()
     knee.set_limit_current(10,15)
-    time.sleep(10)
+    time.sleep(2)
+    print("\n Moving to 5 Degrees \n")
     knee.position_deg(5)
     time.sleep(2)
+    print("\n Moving to 45 Degrees \n")
     knee.position_deg(45)
-    time.sleep(10)
+    time.sleep(2)
     knee.get_velocity()
     knee.read_position()
     knee.read_current()
     knee.get_velocity()
-    time.sleep(10)
+    time.sleep(2)
     print("\n ------------------------ \n")
     knee.idle()
 
-def test_velocity_control():
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+def test_velocity_control(knee):
     #knee.calibrate(10)
     knee.idle()
     print("\n Velocity Control Example \n")
@@ -47,15 +42,13 @@ def test_velocity_control():
     time.sleep(3)
     knee.velocity_deg_s(1)
     knee.follow_velocity()
-    time.sleep(10)
+    time.sleep(2)
     print("\n ------------------------ \n")
     knee.idle()
 
-def test_torque_control(tau_command=0.2):
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+def test_torque_control(knee):
     #knee.calibrate(10)
+    tau_command=0.2 # Nm
     knee.idle()
     print("\n Torque Control Example \n")
     knee.closed_loop()
@@ -68,10 +61,7 @@ def test_torque_control(tau_command=0.2):
     print("\n ------------------------ \n")
     knee.idle()
 
-def test_impedance_control():
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+def test_impedance_control(knee):
     # knee.calibrate(10)
     knee.idle()
     print("\n Impedance Control Example \n")
@@ -85,10 +75,7 @@ def test_impedance_control():
     print("\n ------------------------ \n")
     knee.idle()
 
-def test_sine_movement():
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+def test_sine_movement(knee):
     knee.set_limit_current(10,10)
     knee.set_state(1)
     print("idle")
@@ -108,27 +95,34 @@ def test_sine_movement():
     knee.position_deg(0)
     knee.set_state(1)
 
-def test_idle():
-    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
-    can1 = ODriveCAN(node_id=0,dbc_path=dbc_path)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
-    knee.idle()
-
 
 if __name__ == "__main__":
-    CAN_CH = 'can0'
+    dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
+    node_id = 0
+    CAN_CH = 'can2'
     BITRATE = 1000000  # Default is 1Mb/s 
+    can1 = ODriveCAN(node_id=node_id,dbc_path=dbc_path,bus_name=CAN_CH)
+    knee = ODriveMotor(can1, name="knee", gear_ratio=40)
+
     # os.system(f"source /home/enable-lab/Desktop/OSL-Control/.venv/bin/activate")
+
+    # # CAN SHIELD SETTINGS
+    # os.system(f"sudo ip link set {CAN_CH} down")
+    # os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
+
+    # USB2CAN adapter settings
     os.system(f"sudo ip link set {CAN_CH} down")
-    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE}")
+    os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE} sample-point 0.750")
+    os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
+
     try:
-        # test_position_control()
-        # test_velocity_control()
-        # test_torque_control(0.2)
-        # test_sine_movement()
-        test_impedance_control()
+        test_position_control(knee)
+        test_velocity_control(knee)
+        test_torque_control(knee)
+        test_sine_movement(knee)
+        test_impedance_control(knee)
     
     except KeyboardInterrupt:
         print("Moving Knee to Idle mode")
-        test_idle()    
+        knee.idle()    
         os.system(f"sudo ip link set {CAN_CH} down")
