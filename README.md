@@ -1,35 +1,6 @@
 # OSL-Control
 A repo to test control strategies on the OSLv2 using ODrive and CubeMars motors in the eNaBLe lab.
 
-# Temporary example
-## Instructions to run example
-Turn on motors (connect cable, check battery 100%)
-run can example
-o - turn from idle to closed loop
-
-<!-- ## Example
-===== Dual-Motor Walking Controller =====
-o              - closed loop both motors
-f              - idle both motors
-p1<p>          - knee by <p> degrees (relative)
-p2<p>          - ankle by <p> degrees (relative)
-v1<v>          - knee velocity
-v2<v>          - ankle velocity
-walk           - start walking
-stop           - stop walking
-ep             - print encoder positions (both)
-dump1/dump2    - dump raw/decoded messages for axis
-phase <deg>    - set ankle phase relative to knee (deg)
-phaseboth k a  - set both phases (deg)
-phaseinc k a   - increment phases by k,a degrees
-phasereset     - reset phases to defaults (knee 0°, ankle 180°)
-cal1 <s>       - calibrate knee (optional seconds)
-cal2 <s>       - calibrate ankle (optional seconds)
-save1          - save knee calibration params
-save2          - save ankle calibration params
-x              - exit -->
-
-
 
 # Cascade control architecture for Odrive motors 
 https://docs.odriverobotics.com/v/latest/manual/control.html
@@ -78,3 +49,52 @@ See also the [Mounting guide](https://www.sameskydevices.com/resources/resource-
 We are using Sunrise Instruments Loadcell with its OEM board. 
 
 https://technionmail-my.sharepoint.com/:w:/g/personal/elad_sim_campus_technion_ac_il/IQB34CwJhmjCRr4ecyUJv1SMATLv-zqkLTahnImUDXmteCA?e=xWJupW
+v/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Running Unit Tests
+Validate the mathematics, coordinate transformations, and filtering algorithms:
+```bash
+python -m unittest tests/test_enabletools.py
+```
+
+### 3. Running Hardware Tests (Online)
+To test the real-time loop and hardware adapters:
+```bash
+# Real-time ODrive torque control and loadcell polling
+sudo python tests/test_adapters_real_time.py
+
+# IMU reading test
+python tests/test_imu.py
+```
+
+---
+
+## 🔍 Debugging & Troubleshooting
+
+### 1. CAN Bus Debugging (ODrive & Loadcell)
+If your CAN device is not responding:
+* **Reset the CAN interface:**
+  ```bash
+  sudo ip link set can0 down
+  sudo ip link set can0 up type can bitrate 1000000 sample-point 0.750
+  sudo ip link set can0 txqueuelen 1000
+  ```
+* **Monitor raw CAN traffic:**
+  ```bash
+  candump can0
+  ```
+* **Verify bitrate:** Make sure both the ODrive and the Loadcell board are configured for `1000000` (1 Mb/s).
+
+### 2. I2C Bus Debugging (IMU)
+If the BNO055 IMU initialization fails:
+* **Scan the I2C bus:**
+  ```bash
+  i2cdetect -y 1
+  ```
+* **Address Check:** The BNO055 default address is usually `0x28`. If `i2cdetect` shows `29`, make sure to instantiate the adapter with `addr=0x29`.
+
+### 3. Keyboard Interrupts / Ctrl+C
+* The `SoftRealtimeLoop` class catches `SIGINT` signals internally via its `LoopKiller` module. This means a standard `except KeyboardInterrupt` block will **not** trigger inside the loop.
+* **Solution:** Always perform cleanup tasks (like moving the ODrive to `idle` mode or bringing the CAN interface down) in a `finally:` block, which runs regardless of how the loop exits.
