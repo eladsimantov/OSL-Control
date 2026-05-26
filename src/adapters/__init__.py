@@ -7,3 +7,7 @@ The classes inherit from the sensor/actuator classes defined in opensourceleg mo
 - Encoder: use the AS5048B encoder, which is already implemented by Senthur Ayyappan.
 - Actuator: use the base actuator class, and implement our class using ODrive and our custom CAN interface.
 """
+
+from src.adapters.imu import BNO055Adapter, WitMotionIMUAdapter
+from src.adapters.loadcell import SRILoadCell_M8123B2
+from src.adapters.actuator import ODriveActuator
