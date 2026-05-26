@@ -67,16 +67,33 @@ class SRILoadCell_M8123B2(LoadcellBase):
         self._is_streaming: bool = False
         self._is_calibrated: bool = False
         self._bus = None
+        self._last_update_count: int = 0  # How many frames were received in last update()
 
     def start(self) -> None:
-        """Connects to the CAN bus and sends the continuous measurement trigger."""
+        """Connects to the CAN bus and sends the continuous measurement trigger.
+        
+        Applies hardware-level CAN filters so only loadcell frames (0x291-0x293)
+        are delivered to this bus instance, eliminating processing of unrelated
+        traffic (e.g. ODrive frames) on shared buses.
+        """
         if self.is_offline:
             self._is_streaming = True
             return
 
         try:
-            # Initialize SocketCAN bus
-            self._bus = can.interface.Bus(channel=self._channel, bustype='socketcan')
+            # Hardware CAN filters: only receive loadcell data frames.
+            # This prevents the recv() call from waking up on ODrive traffic
+            # or any other device sharing the same CAN bus.
+            can_filters = [
+                {"can_id": 0x291, "can_mask": 0x7FF, "extended": False},
+                {"can_id": 0x292, "can_mask": 0x7FF, "extended": False},
+                {"can_id": 0x293, "can_mask": 0x7FF, "extended": False},
+            ]
+            self._bus = can.interface.Bus(
+                channel=self._channel,
+                bustype='socketcan',
+                can_filters=can_filters,
+            )
             
             # Send '2' (0x02) to ID #1 to start continuous data 
             start_msg = can.Message(arbitration_id=self._id_query, data=[0x02], is_extended_id=False)
@@ -89,27 +106,33 @@ class SRILoadCell_M8123B2(LoadcellBase):
             self._is_streaming = False
 
     def update(self) -> None:
-        """Collects the three CAN packets and unpacks the 6-axis floats."""
+        """Non-blocking drain of all available loadcell CAN frames.
+        
+        Reads every queued frame with timeout=0 (instant return if empty).
+        This never blocks the real-time loop — it uses whatever data is 
+        freshest. If all 3 frames arrived since the last call, data is 
+        fully updated. If fewer arrived, partially updated data is still 
+        usable (better than blocking). _last_update_count tracks how many
+        frames were received for diagnostics.
+        """
         if self.is_offline or not self._is_streaming:
             return
 
-        # Attempt to capture all three data frames sequentially 
-        received_ids = set()
-        while len(received_ids) < 3:
-            msg = self._bus.recv(timeout=0.01)
+        count = 0
+        while True:
+            msg = self._bus.recv(timeout=0)  # Non-blocking: returns None immediately if empty
             if msg is None:
                 break
             
             # Packets are Little-Endian 4-byte floats 
             if msg.arbitration_id == 0x291:
-                self._data[0], self._data[1] = struct.unpack('<ff', msg.data) # FX, FY
-                received_ids.add(0x291)
+                self._data[0], self._data[1] = struct.unpack('<ff', msg.data)  # FX, FY
             elif msg.arbitration_id == 0x292:
-                self._data[2], self._data[3] = struct.unpack('<ff', msg.data) # FZ, MX
-                received_ids.add(0x292)
+                self._data[2], self._data[3] = struct.unpack('<ff', msg.data)  # FZ, MX
             elif msg.arbitration_id == 0x293:
-                self._data[4], self._data[5] = struct.unpack('<ff', msg.data) # MY, MZ
-                received_ids.add(0x293)
+                self._data[4], self._data[5] = struct.unpack('<ff', msg.data)  # MY, MZ
+            count += 1
+        self._last_update_count = count
 
     def stop(self) -> None:
         """Stops the sensor stream and closes the bus."""

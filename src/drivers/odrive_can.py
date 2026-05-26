@@ -107,6 +107,7 @@ class ODriveMotor:
         self.name = name
         self.alive = True
         self._home_deg = 0.0
+        self.control_mode = 'idle'
 
     def set_state(self, state_id):
         try:
@@ -120,6 +121,7 @@ class ODriveMotor:
 
     def idle(self):
         print(f"→ {self.name}: IDLE")
+        self.control_mode = 'idle'
         self.set_state(1)
 
     def control_mode(self,mode_id,input_id):
@@ -137,14 +139,17 @@ class ODriveMotor:
 
     def torque_control(self):   
         print(f"→ {self.name}: TORQUE_CONTROL")
+        self.control_mode = 'torque'
         self.control_mode(1,1)
 
     def velocity_control(self):
         print(f"→ {self.name}: VELOCITY_CONTROL")
+        self.control_mode = 'velocity'
         self.control_mode(2,1)
         
     def position_control(self):  
         print(f"→ {self.name}: POSITION_CONTROL")
+        self.control_mode = 'position'
         self.control_mode(3,1)
 
     def _read_current_turns(self):
@@ -279,6 +284,25 @@ class ODriveMotor:
                 "Input_Torque": float(torque)
             })
             print(f"torque_nm command: {torque} Nm")
+        except Exception:
+            self.alive = False
+
+    def set_torque_nm(self, torque):
+        """Send a torque command without re-setting control mode or printing.
+        
+        Use this in tight real-time loops where torque_control() has already
+        been called once during setup. Avoids the extra CAN traffic and 
+        console I/O that torque_nm() generates each call.
+        """
+        if not self.alive:
+            return
+        elif self.control_mode != 'torque':
+            print("Please set the control mode to torque to command torques.")
+            return 
+        try:
+            self.can.send_dbc("Axis0_Set_Input_Torque", {
+                "Input_Torque": float(torque)
+            })
         except Exception:
             self.alive = False
 

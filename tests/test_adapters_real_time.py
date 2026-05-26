@@ -35,34 +35,40 @@ if __name__ == "__main__":
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE} sample-point 0.750")
     os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
 
-    knee.idle()
-    knee.closed_loop()
-    
+    # Initialize loadcell (uses CAN filters so ODrive traffic is ignored)
     loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel=CAN_CH)
     loadcell.start()
     loadcell.calibrate()
 
+    # --- One-time motor setup (before the loop) ---
+    knee.idle()
+    knee.set_limit_current(10, 30)
+    knee.closed_loop()
+    knee.torque_control()
+
     loop = SoftRealtimeLoop(dt=0.01)
     try: 
         for t in loop:
-            print("\n Torque Control Example \n")
-            knee.set_limit_current(10,30)
-            knee.closed_loop()
-        
-            knee.torque_nm(0.15)
-            loadcell.update()     
-            if t>=10:
-                print(f"F(xyz) N: [{loadcell.fx:6.2f}, {loadcell.fy:6.2f}, {loadcell.fz:6.2f}] | "
-                        f"M(xyz) Nm: [{loadcell.mx:6.2f}, {loadcell.my:6.2f}, {loadcell.mz:6.2f}]", end='\n')
+            # Read loadcell (non-blocking drain — zero delay)
+            loadcell.update()
 
-            if t >= 5:
-                knee.idle()
-                os.system(f"sudo ip link set {CAN_CH} down")    
-                loop.stop()
+            # Send torque command every iteration (ready for impedance control)
+            knee.set_torque_nm(0.15)
 
-    except KeyboardInterrupt:
-        print("Stopping loop and moving Knee to Idle mode")
-        knee.idle()    
+            # Print loadcell data in-place (carriage return avoids scroll overhead)
+            print(f"\r t={t:6.2f}s | "
+                  f"F(xyz) N: [{loadcell.fx:7.2f}, {loadcell.fy:7.2f}, {loadcell.fz:7.2f}] | "
+                  f"M(xyz) Nm: [{loadcell.mx:7.3f}, {loadcell.my:7.3f}, {loadcell.mz:7.3f}] | "
+                  f"CAN rx: {loadcell._last_update_count}", end='   ')
+
+    finally:
+        # This block ALWAYS runs — whether loop exits via:
+        #   - LoopKiller signal (Ctrl+C → SoftRealtimeLoop swallows SIGINT)
+        #   - loop.stop()
+        #   - Any exception
+        print("\n\nStopping loop and moving Knee to Idle mode")
+        knee.idle()
+        loadcell.stop()
         os.system(f"sudo ip link set {CAN_CH} down")    
         
     # thighIMU= BNO055(tag="Timu", addr=40, offline=False)
