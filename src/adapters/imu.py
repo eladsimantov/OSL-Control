@@ -7,6 +7,12 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
     """
     Local adapter for the Bosch BNO055 IMU.
     Wraps hardware logic to allow 'Offline Mode' on Windows/MacOS.
+
+    To check the adapter address, run the command on your PI: 
+        ```bash 
+        i2cdetect -y 1
+        ```
+        If you see 29, change the "addr" to 0x29 instead of 0x28.
     """
 
     def __init__(

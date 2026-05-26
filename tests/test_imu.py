@@ -17,7 +17,7 @@ def test_imu():
 
     # 1. Hardware Connection Attempt
     # We initialize it with hardware-intent first
-    imu = BNO055Adapter(tag="Ankle IMU", addr=0x28, offline=False)
+    imu = BNO055Adapter(tag="Ankle IMU", addr=0x29, offline=False)
     
     try:
         # In our new adapter, .start() contains the dangerous 'board' imports.
