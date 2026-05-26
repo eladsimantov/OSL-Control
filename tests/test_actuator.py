@@ -99,7 +99,7 @@ def test_sine_movement(knee):
 if __name__ == "__main__":
     dbc_path="/home/enable-lab/Desktop/OSL-Control/src/drivers/odrive-cansimple.dbc"
     node_id = 0
-    CAN_CH = 'can2'
+    CAN_CH = 'can0'
     BITRATE = 1000000  # Default is 1Mb/s 
     can1 = ODriveCAN(node_id=node_id,dbc_path=dbc_path,bus_name=CAN_CH)
     knee = ODriveMotor(can1, name="knee", gear_ratio=40)
