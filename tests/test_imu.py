@@ -9,7 +9,7 @@ import time
 # sys.path.insert(0, project_path)
 
 from src.adapters.imu import BNO055Adapter
-from src.enabletools.filters import quat_to_euler
+from src.enabletools.kinematics import quat_to_euler
 
 def test_imu():
     print("\n" + "="*50)
@@ -55,6 +55,9 @@ def test_imu():
                 f"Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | " 
                 f"Quaternion : [{imu.quat_w:6.2f}, {imu.quat_x:6.2f}, {imu.quat_y:6.2f}, {imu.quat_z:6.2f}] ",
                 end='\r')
+
+            # Display error in euler angle reading from quat
+            print(f"Euler angle error: {quat_to_euler([imu.quat_w,imu.quat_x,imu.quat_y,imu.quat_z])})")
             
             time.sleep(0.05)
 
