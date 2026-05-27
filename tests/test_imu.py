@@ -49,10 +49,11 @@ def test_imu():
             imu.update() 
             
             # Display 6-Axis Data
-            print(
-                f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}] ", 
-                end='\r'
-                )
+            print(f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | " 
+                f"Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}] | " 
+                f"Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | " 
+                f"Quaternion : [{imu.quat_w:6.2f}, {imu.quat_x:6.2f}, {imu.quat_y:6.2f}, {imu.quat_z:6.2f}] ",
+                end='\r')
             
             time.sleep(0.05)
 
