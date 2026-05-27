@@ -9,6 +9,7 @@ import time
 # sys.path.insert(0, project_path)
 
 from src.adapters.imu import BNO055Adapter
+from src.enabletools.filters import quat_to_euler
 
 def test_imu():
     print("\n" + "="*50)
