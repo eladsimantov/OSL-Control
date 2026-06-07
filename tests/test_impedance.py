@@ -40,21 +40,28 @@ if __name__ == "__main__":
 
     loop = SoftRealtimeLoop(dt=0.01)
 
+    state = "free"
 
     try: 
+       
         for t in loop:
-            # Read loadcell (non-blocking drain — zero delay)
             loadcell.update()
-            print(f"non_loop, F ={loadcell.fz}")
+
             if loadcell.fz > 30:
-                for t in loop: 
-                    loadcell.update()
+                state = "stance"
+            
+            if state == "stance":
+                if loadcell.fz <10:
+                    state = "free"
+
+            if state == "stance":
                     print(f"impedance, F={loadcell.fz}")
                     knee.set_impedance()
-            # Send torque command every iteration (ready for impedance control)
-                    if loadcell.fz < 10:
-                        break
 
+            if state =="free":
+                print(f"non_loop, F ={loadcell.fz}")                   
+                    
+           
             # Print loadcell data in-place (carriage return avoids scroll overhead)
             # if round(t/0.01)%10 == 0:
             #     print(f"\r t={t:6.2f}s | "
