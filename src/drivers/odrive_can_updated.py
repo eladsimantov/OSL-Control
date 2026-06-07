@@ -171,9 +171,9 @@ class ODriveMotor:
             return mname, sname, v
 
     def get_position(self):
-        turns =self.get_turns()
+        mname,sname,turns =self.get_turns()
         if turns is not None:
-            self.degrees = 360* (turns / self.gear_ratio)
+            self.degrees = 360* (turns/self.gear_ratio)
             # print (self.degrees)
         return self.degrees
         
@@ -261,14 +261,14 @@ class ODriveMotor:
 
         If absolute==False (default) deg is treated as a relative delta (old behavior).
         If absolute==True deg is treated as an absolute output angle (degrees)
-        relative to stored home baseline (_home_deg).
+        relative to stored home baseline (home_deg).
         """
         if not self.alive:
             return
 
         if absolute:
             # absolute target in output degrees -> convert to motor turns
-            target_deg = deg + self._home_deg
+            target_deg = deg + self.home_deg
             target_turns = (target_deg / 360.0) * self.gear_ratio
             debug_src = "absolute"
         else:
@@ -276,7 +276,7 @@ class ODriveMotor:
             delta_turns = (deg / 360.0) * self.gear_ratio
             mname, sname, cur_turns = self._read_current_turns()
             if cur_turns is None:
-                home_turns = (self._home_deg / 360.0) * self.gear_ratio
+                home_turns = (self.home_deg / 360.0) * self.gear_ratio
                 target_turns = home_turns + delta_turns
                 debug_src = "home_baseline"
             else:
@@ -378,6 +378,7 @@ class ODriveMotor:
         try:
             desired_torque = torque_eq -kp*(Current_position - deg_eq)-kd*(Current_velocity)   
             self.set_motor_torque(desired_torque)
+            print("work")
 
 
         except Exception:
@@ -429,19 +430,19 @@ class ODriveMotor:
                         turns = v / 4096.0
                     else:
                         turns = v
-                    self._home_deg = turns * 360.0 / self.gear_ratio
-                    print(f"→ {self.name}: Set home baseline from {mname}.{sname} = {val} -> home_deg={self._home_deg:.2f}")
+                    self.home_deg = turns * 360.0 / self.gear_ratio
+                    print(f"→ {self.name}: Set home baseline from {mname}.{sname} = {val} -> home_deg={self.home_deg:.2f}")
                     
                     #a try to solve the jumping problem
                     self.set_state(1)
-                    self.position_deg(self._home_deg)
+                    self.position_deg(self.home_deg)
                     time.sleep(1)
                     self.set_state(8)
                     time.sleep(0.2)
                 except Exception:
-                    self._home_deg = 0.0
+                    self.home_deg = 0.0
             else:
-                print(f"→ {self.name}: No encoder message seen yet; home baseline left at {self._home_deg:.2f} deg")
+                print(f"→ {self.name}: No encoder message seen yet; home baseline left at {self.home_deg:.2f} deg")
             print(f"→ {self.name}: CALIBRATION COMPLETE (approx)")
         except Exception:
             self.alive = False
@@ -485,7 +486,7 @@ class ODriveMotor:
                         turns = v
                         note = "turns"
                     deg = turns * 360.0 / self.gear_ratio
-                    print(f"{self.name} [{mname}.{sname}] raw={v} ({note}) -> {deg:.2f} deg (home {self._home_deg:.2f})")
+                    print(f"{self.name} [{mname}.{sname}] raw={v} ({note}) -> {deg:.2f} deg (home {self.home_deg:.2f})")
                 except Exception:
                     print(f"{self.name} [{mname}.{sname}] = {val}")
             else:
