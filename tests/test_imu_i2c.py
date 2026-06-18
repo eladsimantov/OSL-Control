@@ -9,6 +9,7 @@ import time
 # sys.path.insert(0, project_path)
 
 from src.adapters.imu import BNO055Adapter
+from src.enabletools.kinematics import quat_to_euler
 
 def test_imu():
     print("\n" + "="*50)
@@ -48,11 +49,20 @@ def test_imu():
             # Poll the sensor (online reads hardware, offline does nothing)
             imu.update() 
             
-            # Display 6-Axis Data
-            print(
-                f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}] ", 
-                end='\r'
-                )
+            # # Display 6-Axis Data
+            # print(f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | " 
+            #     f"Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}] | " 
+            #     f"Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | " 
+            #     f"Quaternion : [{imu.quat_w:6.2f}, {imu.quat_x:6.2f}, {imu.quat_y:6.2f}, {imu.quat_z:6.2f}] ",
+            #     end='\r')
+
+            print(f"Acc  (m/s^2): [{imu.acc_x:6.2f}, {imu.acc_y:6.2f}, {imu.acc_z:6.2f}] | " 
+                f"Gyro (rad/s): [{imu.gyro_x:6.2f}, {imu.gyro_y:6.2f}, {imu.gyro_z:6.2f}] | "
+                f"Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | " ,
+                end='\r')
+
+            # # Display error in euler angle reading from quat
+            # print(f"Euler angle error: {quat_to_euler([imu.quat_w,imu.quat_x,imu.quat_y,imu.quat_z])})")
             
             time.sleep(0.05)
 

@@ -269,6 +269,7 @@ class WitMotionIMUAdapter(IMUBase):
         """
         if self.is_offline:
             # Simulated fake data in offline mode
+            print("FAKE DATA!!!!")
             t = time.time() if hasattr(time, 'time') else 0.0
             self._euler_data = [10.0 * math.sin(t), 5.0 * math.cos(t), 20.0 * math.sin(0.5 * t)]
             

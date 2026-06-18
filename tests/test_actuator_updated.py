@@ -1,6 +1,7 @@
 # !/usr/bin/env python3
-import os
+# import osl
 import sys
+import os
 import time
 import math
 import numpy as np
@@ -8,7 +9,7 @@ import numpy as np
 # project_path = os.path.join(tests_path, "..")
 # sys.path.insert(0, project_path)
 # from can_example_2026 import ODriveCAN, ODriveMotor
-from src.drivers.odrive_can import ODriveCAN, ODriveMotor
+from src.drivers.odrive_can_updated import ODriveCAN, ODriveMotor
 # from src.adapters.actuator import ODriveActuator
 # from opensourceleg.actuators import MOTOR_CONSTANTS
 
@@ -32,36 +33,38 @@ def test_position_control(knee):
     knee.position_deg(60)
     time.sleep(2)
     knee.get_velocity()
-    knee.read_position()
-    knee.read_current()
+    knee.get_position()
+    knee.get_current()
     knee.get_velocity()
     time.sleep(2)
     print("\n ------------------------ \n")
     knee.idle()
 
 def test_velocity_control(knee):
-    #knee.calibrate(10)
+    knee.calibrate(10)
     knee.idle()
     print("\n Velocity Control Example \n")
     knee.set_limit_current(max_current=10, max_velocity=5)
     knee.closed_loop()
+    knee.velocity_control()
     time.sleep(3)
-    knee.velocity_deg_s(1)
-    knee.follow_velocity()
+    knee.set_motor_velocity(5)
+    knee.follow_velocity(stop_time=5)
     time.sleep(2)
     print("\n ------------------------ \n")
     knee.idle()
 
 def test_torque_control(knee):
-    #knee.calibrate(10)
+    knee.calibrate(10)
     tau_command=0.165 # Nm
     knee.idle()
     print("\n Torque Control Example \n")
     knee.closed_loop()
+    knee.torque_control
     time.sleep(1.5)
     knee.set_limit_current(max_current=10, max_velocity=20)
-    knee.torque_nm(tau_command)
-    knee.follow_current()
+    knee.set_motor_torque(tau_command)
+    knee.follow_current(stop_time=5)
 
     
     print("\n ------------------------ \n")
@@ -163,8 +166,8 @@ if __name__ == "__main__":
     try:
         
         test_position_control(knee)
-        # test_velocity_control(knee)
-        # test_torque_control(knee)
+        #test_velocity_control(knee)
+        #test_torque_control(knee)
         # test_sine_movement(knee)
         # test_impedance_control(knee)
         # knee.idle()
