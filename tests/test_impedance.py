@@ -1,6 +1,7 @@
 
 import os
 import sys
+import time
 tests_path = os.path.dirname(os.path.abspath(__file__))
 project_path = os.path.join(tests_path, "..")
 sys.path.insert(0, project_path)
@@ -33,6 +34,7 @@ if __name__ == "__main__":
 
 
     # --- One-time motor setup (before the loop) ---
+    knee.calibrate()
     knee.idle()
     knee.set_limit_current(10, 30)
     knee.closed_loop()

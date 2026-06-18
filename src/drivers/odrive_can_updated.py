@@ -362,18 +362,26 @@ class ODriveMotor:
 
 
     #this function cant work without torque measurments
-    def set_impedance(self,kp=0.01,kd=0.0,deg_eq=30,torque_eq=0):
-
+    
+    def set_impedance(self,kp=0.01,kd=0.0,deg_eq=30,torque_eq=0, pos_deg=None, vel_dps=None):
+        print("not_work")
         if not self.alive:
                     return
             #not right 
-        try:
-            Current_position = self.read_position()
-            Current_velocity = self.get_velocity()
-            
-            
-        except Exception:
-                    self.alive = False
+        if pos_deg == None:
+            try:
+                Current_position = self.read_position()                
+        
+            except Exception:
+                        self.alive = False
+
+        if vel_dps == None:
+            try:
+                Current_velocity = self.get_velocity()                
+        
+            except Exception:
+                        self.alive = False             
+
 
         try:
             desired_torque = torque_eq -kp*(Current_position - deg_eq)-kd*(Current_velocity)   
