@@ -32,8 +32,8 @@ def test_position_control(knee):
     knee.position_deg(60)
     time.sleep(2)
     knee.get_velocity()
-    knee.read_position()
-    knee.read_current()
+    knee.get_position()
+    knee.get_current()
     knee.get_velocity()
     time.sleep(2)
     print("\n ------------------------ \n")
@@ -114,8 +114,13 @@ def test_impedance_control(knee):
     knee.closed_loop()
     time.sleep(3)
     
-    #for refrence: impedance_control(self, kp=0.1, kd=0, pos_eq_deg=30.0, stop_time=10,torque_eq_nm=0)
-    knee.impedance_control(kp=0.020, kd=0.00006,pos_eq_deg=40,stop_time=20)
+    # Run impedance control loop for 20 seconds
+    start_time = time.time()
+    dt = 0.01  # 100 Hz loop
+    while time.time() - start_time < 20:
+        t_loop = time.time()
+        knee.set_impedance(kp=0.020, kd=0.00006, deg_eq=40.0, torque_eq=0.0)
+        time.sleep(max(0, dt - (time.time() - t_loop)))
     
     print("\n ------------------------ \n")
     knee.idle()

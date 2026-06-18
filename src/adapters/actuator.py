@@ -123,7 +123,7 @@ class ODriveActuator(ActuatorBase):
     def update(self):
         if not self.is_offline:
             # 1. Read instantaneous states from hardware driver
-            mname, sname, turns = self.driver._read_current_turns()
+            mname, sname, turns = self.driver.get_turns()
             if turns is not None:
                 self.q = float(turns * 2.0 * math.pi)
                 
@@ -131,7 +131,7 @@ class ODriveActuator(ActuatorBase):
             if vel_deg_s is not None:
                 self.qdot = float(math.radians(vel_deg_s))
                     
-            curr = self.driver.read_current()
+            curr = self.driver.get_current()
             if curr is not None:
                 self._motor_current = float(curr)
                 self._motor_torque = self._motor_current * self.MOTOR_CONSTANTS.NM_PER_AMP
@@ -242,17 +242,17 @@ class ODriveActuator(ActuatorBase):
             return
 
         # Perform zero-jump homing
-        mname, sname, turns = self.driver._read_current_turns()
+        mname, sname, turns = self.driver.get_turns()
         if turns is not None:
             self.driver.can.send_dbc("Axis0_Set_Input_Pos", {
                 "Input_Pos": float(turns),
                 "Vel_FF": 0.0,
                 "Torque_FF": 0.0
             })
-            self.driver._home_deg = (turns / self.driver.gear_ratio) * 360.0
-            LOGGER.info(f"[{self.tag}] Homed ODrive to: {self.driver._home_deg:.2f} degrees")
+            self.driver.home_deg = (turns / self.driver.gear_ratio) * 360.0
+            LOGGER.info(f"[{self.tag}] Homed ODrive to: {self.driver.home_deg:.2f} degrees")
         else:
-            self.driver._home_deg = 0.0
+            self.driver.home_deg = 0.0
             LOGGER.warning(f"[{self.tag}] Could not read encoder turns, default homing to 0.0")
         
         self._is_homed = True

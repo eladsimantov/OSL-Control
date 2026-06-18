@@ -53,7 +53,7 @@ if __name__ == "__main__":
             loadcell.update()
 
             # Send torque command every iteration (ready for impedance control)
-            knee.set_torque_nm(-0.1)
+            knee.set_motor_torque(-0.1)
 
             # Print loadcell data in-place (carriage return avoids scroll overhead)
             if round(t/0.01)%10 == 0:
