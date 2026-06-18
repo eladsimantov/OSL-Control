@@ -98,6 +98,7 @@ def test_loop_killer_signals():
     
     try:
         for t in clock:
+            print(clock.n)
             # Doing mock sensor reads
             if clock.n % 10 == 0:
                 print(f"  Time: {t:.2f}s (running...)")

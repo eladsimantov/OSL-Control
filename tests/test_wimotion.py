@@ -31,6 +31,7 @@ def notification_handler(sender, data):
                 
                 if accel is not None:
                     print(f"[ACCEL] X: {accel[0]:+.3f}g | Y: {accel[1]:+.3f}g | Z: {accel[2]:+.3f}g")
+
                 if gyro is not None:
                     print(f"[GYRO]  X: {gyro[0]:+.2f}°/s | Y: {gyro[1]:+.2f}°/s | Z: {gyro[2]:+.2f}°/s")
                     print("-" * 50)

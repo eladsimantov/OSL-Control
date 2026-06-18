@@ -53,7 +53,7 @@ if __name__ == "__main__":
             loadcell.update()
 
             # Send torque command every iteration (ready for impedance control)
-            knee.set_torque_nm(0.15)
+            knee.set_torque_nm(-0.1)
 
             # Print loadcell data in-place (carriage return avoids scroll overhead)
             if round(t/0.01)%10 == 0:
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # can1 = ODriveCAN(node_id=1)
     # kneeActuator = ODriveActuator(
-    #             tag="act1",
+    #             tag="act1"
     #             can_interface=can1,
     #             gear_ratio=100,
     #             motor_constants=MOTOR_CONSTANTS(2048, 0.02, 0.001, 0.0001, 80.0, 120.0)
