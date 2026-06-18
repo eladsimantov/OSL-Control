@@ -40,19 +40,23 @@ if __name__ == "__main__":
     loadcell.start()
     loadcell.calibrate()
 
-    # Initialize WitMotion Bluetooth IMU
-    imu = WitMotionIMUAdapter(tag="WitMotion IMU", port="/dev/rfcomm0", offline=False)
+    thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21")
+    foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EF:D5:AC:1A:0D:21")
+
     try:
         print("[STATUS] Connecting to Bluetooth IMU on /dev/rfcomm0...")
-        imu.start()
-        if not imu.is_streaming:
+        thigh_imu.start()
+        foot_imu.start()
+        if not thigh_imu.is_streaming or not foot_imu.is_streaming:
             raise ConnectionError("IMU started but is not streaming.")
         print("[STATUS] SUCCESS: Connected to WitMotion IMU via Bluetooth.")
     except (ImportError, NotImplementedError, Exception) as e:
         print(f"[STATUS] HARDWARE/OS ERROR: {e}")
         print("[STATUS] FALLBACK: Starting in OFFLINE MODE (Simulation).")
-        imu._offline = True
-        imu.start()
+        thigh_imu._offline = True
+        foot_imu._offline = True
+        thigh_imu.start()
+        foot_imu.start()
 
     # --- One-time motor setup (before the loop) ---
     knee.idle()
@@ -65,7 +69,8 @@ if __name__ == "__main__":
         for t in loop:
             # Read loadcell and IMU (non-blocking)
             loadcell.update()
-            imu.update()
+            thigh_imu.update()
+            foot_imu.update()
 
             # Send torque command every iteration (ready for impedance control)
             # knee.set_motor_torque(-0.1)
@@ -78,7 +83,8 @@ if __name__ == "__main__":
                 print(f"\r t={t:6.2f}s | "
                       f"F(xyz) N: [{loadcell.fx:7.2f}, {loadcell.fy:7.2f}, {loadcell.fz:7.2f}] | "
                       f"M(xyz) Nm: [{loadcell.mx:7.3f}, {loadcell.my:7.3f}, {loadcell.mz:7.3f}] | "
-                      f"IMU Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | "
+                      f"Thigh (deg): [{thigh_imu.euler_x:6.2f}, {thigh_imu.euler_y:6.2f}, {thigh_imu.euler_z:6.2f}] | "
+                      f"Foot (deg): [{foot_imu.euler_x:6.2f}, {foot_imu.euler_y:6.2f}, {foot_imu.euler_z:6.2f}] | "
                       f"CAN rx: {loadcell._last_update_count}", end='   ')
 
     finally:
@@ -89,7 +95,8 @@ if __name__ == "__main__":
         print("\n\nStopping loop and moving Knee to Idle mode")
         knee.idle()
         loadcell.stop()
-        imu.stop()
+        thigh_imu.stop()
+        foot_imu.stop()
         os.system(f"sudo ip link set {CAN_CH} down")    
         
     # thighIMU= BNO055(tag="Timu", addr=40, offline=False)
