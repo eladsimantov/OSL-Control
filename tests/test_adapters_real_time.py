@@ -41,7 +41,7 @@ if __name__ == "__main__":
     loadcell.calibrate()
 
     thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21")
-    foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EF:D5:AC:1A:0D:21")
+    foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EC:8E:70:CE:63:24")
 
     try:
         print("[STATUS] Connecting to Bluetooth IMU on /dev/rfcomm0...")
