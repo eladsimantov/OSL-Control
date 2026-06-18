@@ -184,64 +184,85 @@ class ODriveMotor:
         else:
             return mname, sname, v
 
-    def get_position(self):
-        # Fast O(1) Lookup: Check the standard DBC estimates message first
+    def get_state(self):
+        """
+        Reads position (deg), velocity (deg/s), and current (A) in a single unified state.
+        This ensures synchronized and consistent state readings.
+        """
+        # --- 1. Position ---
+        pos_deg = None
         msg_name = f"Axis{self.can.axisID}_Get_Encoder_Estimates"
         signals = self.can.latest.get((self.can.axisID, msg_name))
         if signals and "Pos_Estimate" in signals:
             try:
                 turns = float(signals["Pos_Estimate"])
-                self.degrees = 360.0 * (turns / self.gear_ratio)
-                return self.degrees
+                pos_deg = 360.0 * (turns / self.gear_ratio)
+                self.degrees = pos_deg
             except (ValueError, TypeError):
                 pass
 
-        # Fallback to general lookup
-        mname, sname, turns = self.get_turns()
-        if turns is not None:
-            self.degrees = 360.0 * (turns / self.gear_ratio)
-        return self.degrees
-        
-    def get_velocity(self):
-        # Fast O(1) Lookup: Check the standard DBC estimates message first
-        msg_name = f"Axis{self.can.axisID}_Get_Encoder_Estimates"
-        signals = self.can.latest.get((self.can.axisID, msg_name))
+        if pos_deg is None:
+            mname, sname, turns = self.get_turns()
+            if turns is not None:
+                pos_deg = 360.0 * (turns / self.gear_ratio)
+                self.degrees = pos_deg
+            else:
+                pos_deg = self.degrees
+
+        # --- 2. Velocity ---
+        vel_dps = None
         if signals and "Vel_Estimate" in signals:
             try:
                 turns_s = float(signals["Vel_Estimate"])
-                return (turns_s / self.gear_ratio) * 360.0
+                vel_dps = (turns_s / self.gear_ratio) * 360.0
             except (ValueError, TypeError):
                 pass
 
-        # Fallback to general lookup
-        candidates = ["vel_estimate", "velocity", "encoder_vel", "velocity_estimate"]
-        mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-        if val is not None:
+        if vel_dps is None:
+            candidates = ["vel_estimate", "velocity", "encoder_vel", "velocity_estimate"]
+            mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+            if val is not None:
+                try:
+                    vel_dps = (float(val) / self.gear_ratio) * 360.0
+                except (ValueError, TypeError):
+                    vel_dps = 0.0
+            else:
+                vel_dps = 0.0
+
+        # --- 3. Current ---
+        current_amp = None
+        msg_iq = f"Axis{self.can.axisID}_Get_Iq"
+        signals_iq = self.can.latest.get((self.can.axisID, msg_iq))
+        if signals_iq and "Iq_Measured" in signals_iq:
             try:
-                return (float(val) / self.gear_ratio) * 360.0
+                current_amp = float(signals_iq["Iq_Measured"])
             except (ValueError, TypeError):
                 pass
-        return 0.0
+
+        if current_amp is None:
+            candidates = ["Iq_Measured", "motor_current", "current"]
+            mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
+            if val is not None:
+                try:
+                    current_amp = float(val)
+                except (ValueError, TypeError):
+                    current_amp = 0.0
+            else:
+                current_amp = 0.0
+
+        return pos_deg, vel_dps, current_amp
+
+    def get_position(self):
+        pos, _, _ = self.get_state()
+        return pos
+        
+    def get_velocity(self):
+        _, vel, _ = self.get_state()
+        return vel
 
     def get_current(self):
-        # Fast O(1) Lookup: Check the standard DBC Iq message first
-        msg_name = f"Axis{self.can.axisID}_Get_Iq"
-        signals = self.can.latest.get((self.can.axisID, msg_name))
-        if signals and "Iq_Measured" in signals:
-            try:
-                return float(signals["Iq_Measured"])
-            except (ValueError, TypeError):
-                pass
-
-        # Fallback to general lookup
-        candidates = ["Iq_Measured", "motor_current", "current"]
-        mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-        if val is not None:
-            try:
-                return float(val)
-            except (ValueError, TypeError):
-                pass
-        return 0.0
+        _, _, curr = self.get_state()
+        return curr
         
     # the follow function are ment for live graph creating. and we will not use them
 
@@ -395,14 +416,18 @@ class ODriveMotor:
         if not self.alive:
             return
 
-        current_position = pos_deg if pos_deg is not None else self.get_position()
-        current_velocity = vel_dps if vel_dps is not None else self.get_velocity()
+        if pos_deg is None or vel_dps is None:
+            pos_val, vel_val, _ = self.get_state()
+            if pos_deg is None:
+                pos_deg = pos_val
+            if vel_dps is None:
+                vel_dps = vel_val
 
-        if current_position is None or current_velocity is None:
+        if pos_deg is None or vel_dps is None:
             return
 
         try:
-            desired_torque = - kp * (current_position - deg_eq) - kd * current_velocity
+            desired_torque = - kp * (pos_deg - deg_eq) - kd * vel_dps
             self.set_motor_torque(desired_torque)
         except Exception:
             self.alive = False
