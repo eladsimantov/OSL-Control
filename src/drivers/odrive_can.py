@@ -391,7 +391,7 @@ class ODriveMotor:
         except Exception:
             self.alive = False    
 
-    def set_impedance(self, kp=0.01, kd=0.0, deg_eq=30.0, torque_eq=0.0, pos_deg=None, vel_dps=None):
+    def set_impedance(self, kp=0.01, kd=0.0, deg_eq=0.0, pos_deg=None, vel_dps=None):
         if not self.alive:
             return
 
@@ -402,7 +402,7 @@ class ODriveMotor:
             return
 
         try:
-            desired_torque = torque_eq - kp * (current_position - deg_eq) - kd * current_velocity
+            desired_torque = - kp * (current_position - deg_eq) - kd * current_velocity
             self.set_motor_torque(desired_torque)
         except Exception:
             self.alive = False

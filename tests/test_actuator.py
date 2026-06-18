@@ -107,19 +107,19 @@ def test_torque_sin(knee):
     return
 
 def test_impedance_control(knee):
-    # knee.calibrate(10)
+    # knee.calibrate(15)
     knee.idle()
     print("\n Impedance Control Example \n")
     knee.set_limit_current(10,30)
     knee.closed_loop()
-    time.sleep(3)
+    time.sleep(1)
     
     # Run impedance control loop for 20 seconds
     start_time = time.time()
     dt = 0.01  # 100 Hz loop
     while time.time() - start_time < 20:
         t_loop = time.time()
-        knee.set_impedance(kp=0.020, kd=0.00006, deg_eq=40.0, torque_eq=0.0)
+        knee.set_impedance(kp=0.0002, kd=0.00006, deg_eq=40.0)
         time.sleep(max(0, dt - (time.time() - t_loop)))
     
     print("\n ------------------------ \n")
@@ -167,11 +167,11 @@ if __name__ == "__main__":
 
     try:
         
-        test_position_control(knee)
+        # test_position_control(knee)
         # test_velocity_control(knee)
         # test_torque_control(knee)
         # test_sine_movement(knee)
-        # test_impedance_control(knee)
+        test_impedance_control(knee)
         # knee.idle()
         # test_torque_sin(knee)
     
