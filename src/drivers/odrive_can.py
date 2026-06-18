@@ -120,6 +120,7 @@ class ODriveMotor:
         self.name = name
         self.alive = True
         self.home_deg = 0.0
+        self.degrees = 0.0
         self.Vel_FF = 0.0
         self.Torque_FF = 0.0
         self.mode = 'idle'
@@ -184,37 +185,63 @@ class ODriveMotor:
             return mname, sname, v
 
     def get_position(self):
+        # Fast O(1) Lookup: Check the standard DBC estimates message first
+        msg_name = f"Axis{self.can.axisID}_Get_Encoder_Estimates"
+        signals = self.can.latest.get((self.can.axisID, msg_name))
+        if signals and "Pos_Estimate" in signals:
+            try:
+                turns = float(signals["Pos_Estimate"])
+                self.degrees = 360.0 * (turns / self.gear_ratio)
+                return self.degrees
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback to general lookup
         mname, sname, turns = self.get_turns()
         if turns is not None:
-            self.degrees = 360 * (turns / self.gear_ratio)
+            self.degrees = 360.0 * (turns / self.gear_ratio)
         return self.degrees
         
     def get_velocity(self):
+        # Fast O(1) Lookup: Check the standard DBC estimates message first
+        msg_name = f"Axis{self.can.axisID}_Get_Encoder_Estimates"
+        signals = self.can.latest.get((self.can.axisID, msg_name))
+        if signals and "Vel_Estimate" in signals:
+            try:
+                turns_s = float(signals["Vel_Estimate"])
+                return (turns_s / self.gear_ratio) * 360.0
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback to general lookup
         candidates = ["vel_estimate", "velocity", "encoder_vel", "velocity_estimate"]
         mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-        if val is None:
-            return None
-        try:
-            v = float(val)
-            deg_s = (v / self.gear_ratio) * 360.0
-            print(f"Velocity reading: {deg_s} deg/s")
-            return deg_s
-        except Exception:
-            return None
+        if val is not None:
+            try:
+                return (float(val) / self.gear_ratio) * 360.0
+            except (ValueError, TypeError):
+                pass
+        return 0.0
 
     def get_current(self):
+        # Fast O(1) Lookup: Check the standard DBC Iq message first
+        msg_name = f"Axis{self.can.axisID}_Get_Iq"
+        signals = self.can.latest.get((self.can.axisID, msg_name))
+        if signals and "Iq_Measured" in signals:
+            try:
+                return float(signals["Iq_Measured"])
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback to general lookup
         candidates = ["Iq_Measured", "motor_current", "current"]
         mname, sname, val = self.can.find_signal(self.can.axisID, candidates)
-        if val is None:
-            print("something wrong with current reading")
-            return None
-        try:
-            v = float(val)
-            print(f"Current reading: {v} A")
-            return v
-        except Exception:
-            print("different somehing is wrong with current reading")
-            return None
+        if val is not None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                pass
+        return 0.0
         
     # the follow function are ment for live graph creating. and we will not use them
 
@@ -367,29 +394,15 @@ class ODriveMotor:
     def set_impedance(self, kp=0.01, kd=0.0, deg_eq=30.0, torque_eq=0.0, pos_deg=None, vel_dps=None):
         if not self.alive:
             return
-            
-        if pos_deg is None:
-            try:
-                current_position = self.get_position()                
-            except Exception:
-                self.alive = False
-                return
-        else:
-            current_position = pos_deg
 
-        if vel_dps is None:
-            try:
-                current_velocity = self.get_velocity()
-                if current_velocity is None:
-                    current_velocity = 0.0                
-            except Exception:
-                self.alive = False
-                return
-        else:
-            current_velocity = vel_dps
+        current_position = pos_deg if pos_deg is not None else self.get_position()
+        current_velocity = vel_dps if vel_dps is not None else self.get_velocity()
+
+        if current_position is None or current_velocity is None:
+            return
 
         try:
-            desired_torque = torque_eq - kp * (current_position - deg_eq) - kd * current_velocity   
+            desired_torque = torque_eq - kp * (current_position - deg_eq) - kd * current_velocity
             self.set_motor_torque(desired_torque)
         except Exception:
             self.alive = False
