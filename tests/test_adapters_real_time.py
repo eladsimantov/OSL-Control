@@ -15,7 +15,7 @@ project_path = os.path.join(tests_path, "..")
 sys.path.insert(0, project_path)
 from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 # from opensourceleg.actuators import ActuatorBase, MOTOR_CONSTANTS, CONTROL_MODES
-# from src.adapters.imu import IMUAdapter
+from src.adapters.imu import WitMotionIMUAdapter
 # from opensourceleg.sensors.imu import BNO055
 from src.adapters.loadcell import SRILoadCell_M8123B2
 
@@ -40,6 +40,20 @@ if __name__ == "__main__":
     loadcell.start()
     loadcell.calibrate()
 
+    # Initialize WitMotion Bluetooth IMU
+    imu = WitMotionIMUAdapter(tag="WitMotion IMU", port="/dev/rfcomm0", offline=False)
+    try:
+        print("[STATUS] Connecting to Bluetooth IMU on /dev/rfcomm0...")
+        imu.start()
+        if not imu.is_streaming:
+            raise ConnectionError("IMU started but is not streaming.")
+        print("[STATUS] SUCCESS: Connected to WitMotion IMU via Bluetooth.")
+    except (ImportError, NotImplementedError, Exception) as e:
+        print(f"[STATUS] HARDWARE/OS ERROR: {e}")
+        print("[STATUS] FALLBACK: Starting in OFFLINE MODE (Simulation).")
+        imu._offline = True
+        imu.start()
+
     # --- One-time motor setup (before the loop) ---
     knee.idle()
     knee.set_limit_current(10, 30)
@@ -49,8 +63,9 @@ if __name__ == "__main__":
     loop = SoftRealtimeLoop(dt=0.01)
     try: 
         for t in loop:
-            # Read loadcell (non-blocking drain — zero delay)
+            # Read loadcell and IMU (non-blocking)
             loadcell.update()
+            imu.update()
 
             # Send torque command every iteration (ready for impedance control)
             # knee.set_motor_torque(-0.1)
@@ -58,11 +73,12 @@ if __name__ == "__main__":
             knee.set_impedance(kp=0.02, kd=0.0006, deg_eq=0.0)
             # knee.set_impedance(kp=0.02, kd=0.0006, deg_eq=0.0, pos_deg=knee.get_position(), vel_dps=knee.get_position())
 
-            # Print loadcell data in-place (carriage return avoids scroll overhead)
+            # Print loadcell and IMU data in-place (carriage return avoids scroll overhead)
             if round(t/0.01)%10 == 0:
                 print(f"\r t={t:6.2f}s | "
                       f"F(xyz) N: [{loadcell.fx:7.2f}, {loadcell.fy:7.2f}, {loadcell.fz:7.2f}] | "
                       f"M(xyz) Nm: [{loadcell.mx:7.3f}, {loadcell.my:7.3f}, {loadcell.mz:7.3f}] | "
+                      f"IMU Euler (deg): [{imu.euler_x:6.2f}, {imu.euler_y:6.2f}, {imu.euler_z:6.2f}] | "
                       f"CAN rx: {loadcell._last_update_count}", end='   ')
 
     finally:
@@ -73,6 +89,7 @@ if __name__ == "__main__":
         print("\n\nStopping loop and moving Knee to Idle mode")
         knee.idle()
         loadcell.stop()
+        imu.stop()
         os.system(f"sudo ip link set {CAN_CH} down")    
         
     # thighIMU= BNO055(tag="Timu", addr=40, offline=False)

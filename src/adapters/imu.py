@@ -156,11 +156,13 @@ class WitMotionIMUAdapter(IMUBase):
     def __init__(
         self,
         tag: str = "WitMotion",
+        mac_address: str = None,
         port: str = "/dev/rfcomm0",
         baudrate: int = 115200,
         offline: bool = False
     ) -> None:
         super().__init__(tag=tag, offline=offline)
+        self._mac_address = mac_address
         self._port = port
         self._baudrate = baudrate
         self._gyro_data = [0.0, 0.0, 0.0]
@@ -170,44 +172,81 @@ class WitMotionIMUAdapter(IMUBase):
         
         self._is_streaming = False
         self._serial = None
+        self._socket = None
+        self._using_socket = False
         self._thread = None
         self._running = False
         self._lock = threading.Lock()
 
     def start(self) -> None:
-        """Connects to the Bluetooth serial port and starts the background listener."""
+        """Connects to the Bluetooth device (directly via socket or serial port) and starts the background listener."""
         if self.is_offline:
             self._is_streaming = True
             LOGGER.info(f"[{self.tag}] Started in OFFLINE mode (Simulation).")
             return
 
         try:
-            # Open RFCOMM serial port
-            self._serial = serial.Serial(self._port, baudrate=self._baudrate, timeout=0.1)
-            self._running = True
+            if self._mac_address:
+                import socket
+                if not hasattr(socket, 'AF_BLUETOOTH'):
+                    raise NotImplementedError(
+                        f"Direct Bluetooth connection is not supported on this OS. "
+                        f"Please pair the device at OS-level and use serial `port` parameter instead."
+                    )
+                
+                LOGGER.info(f"[{self.tag}] Connecting directly via Bluetooth RFCOMM socket to {self._mac_address}...")
+                self._socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
+                self._socket.settimeout(5.0)
+                # Channel 1 is standard for WitMotion SPP Bluetooth connection
+                self._socket.connect((self._mac_address, 1))
+                self._socket.settimeout(0.1)
+                self._using_socket = True
+                LOGGER.info(f"[{self.tag}] Bluetooth socket connection established.")
+            else:
+                # Open RFCOMM serial port
+                self._serial = serial.Serial(self._port, baudrate=self._baudrate, timeout=0.1)
+                self._using_socket = False
+                LOGGER.info(f"[{self.tag}] Bluetooth Serial opened on {self._port}")
             
+            self._running = True
             # Start background reading thread
             self._thread = threading.Thread(target=self._read_loop, daemon=True)
             self._thread.start()
             
             self._is_streaming = True
-            LOGGER.info(f"[{self.tag}] Bluetooth Serial opened on {self._port}")
         except Exception as e:
-            LOGGER.error(f"[{self.tag}] Failed to open Bluetooth Serial: {e}")
+            LOGGER.error(f"[{self.tag}] Failed to open Bluetooth connection: {e}")
+            if self._socket:
+                try:
+                    self._socket.close()
+                except Exception:
+                    pass
+                self._socket = None
             self._is_streaming = False
 
     def _read_loop(self) -> None:
         """Background thread reading and parsing WitMotion packets continuously."""
         buffer = bytearray()
+        import socket
         while self._running:
             try:
-                if self._serial.in_waiting > 0:
-                    data = self._serial.read(self._serial.in_waiting)
-                    buffer.extend(data)
+                if self._using_socket:
+                    try:
+                        data = self._socket.recv(1024)
+                        if not data:
+                            LOGGER.warning(f"[{self.tag}] Bluetooth socket connection closed by peer.")
+                            break
+                        buffer.extend(data)
+                    except socket.timeout:
+                        continue
                 else:
-                    # Small sleep to prevent 100% CPU thread thrashing
-                    time.sleep(0.001)
-                    continue
+                    if self._serial.in_waiting > 0:
+                        data = self._serial.read(self._serial.in_waiting)
+                        buffer.extend(data)
+                    else:
+                        # Small sleep to prevent 100% CPU thread thrashing
+                        time.sleep(0.001)
+                        continue
 
                 # WitMotion standard packets are exactly 11 bytes
                 while len(buffer) >= 11:
@@ -274,7 +313,7 @@ class WitMotionIMUAdapter(IMUBase):
             self._euler_data = [10.0 * math.sin(t), 5.0 * math.cos(t), 20.0 * math.sin(0.5 * t)]
             
     def stop(self) -> None:
-        """Safely stops the thread and closes the serial port."""
+        """Safely stops the thread and closes connections."""
         self._running = False
         if self._thread:
             self._thread.join(timeout=1.0)
@@ -283,6 +322,12 @@ class WitMotionIMUAdapter(IMUBase):
                 self._serial.close()
             except Exception:
                 pass
+        if self._socket:
+            try:
+                self._socket.close()
+            except Exception:
+                pass
+            self._socket = None
         self._is_streaming = False
 
     @property
