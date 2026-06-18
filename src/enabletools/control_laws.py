@@ -37,3 +37,22 @@ def cvp_controller(X_t: float, X_f: float, V: np.ndarray, mu: np.ndarray) -> flo
     X_s = mu[1] - (1/V[1, 2]) * ( (X_t - mu[0])*V[0, 2] + (X_f - mu[2])*V[2, 2] )
     return X_s
     
+def estimate_T12(xt, xf, V, mu):
+    """Calculate the instantaneous estimate of the PC scores given the thigh and foot 
+    elevation space variables, the PC vector matrix and means.
+
+    Args: 
+        xt (float): The thigh elevation space variable.
+        xf (float): The foot elevation space variable.
+        V (np.ndarray): The Principal Component vectors in matrix form (eigenvectors as columns).
+        mu (np.ndarray): The mean values of the thigh, shank and foot variables.
+        
+    Returns: 
+        t1 (float): The first PC score estimate.
+        t2 (float): The second PC score estimate.
+
+    """
+    A = V[[0,2], :2]
+    x = np.array([xt - mu[0], xf - mu[2]])
+    T12 = np.linalg.solve(A, x)
+    return T12[0], T12[1]
