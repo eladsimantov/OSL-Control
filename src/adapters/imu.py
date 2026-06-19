@@ -148,6 +148,7 @@ class _BLEManager:
 
     def __init__(self):
         self._devices = {}  # mac_address -> WitMotionIMUAdapter instance
+        self._tasks = {}    # mac_address -> asyncio.Task
         self._thread = None
         self._loop = None
         self._running = False
@@ -169,13 +170,23 @@ class _BLEManager:
             else:
                 # If loop is already running, schedule the new connection task on it
                 if self._loop and self._loop.is_running():
-                    asyncio.run_coroutine_threadsafe(self._connect_and_stream(mac), self._loop)
+                    def schedule_task():
+                        task = self._loop.create_task(self._connect_and_stream(mac))
+                        with self._lock:
+                            self._tasks[mac] = task
+                    self._loop.call_soon_threadsafe(schedule_task)
 
     def unregister_device(self, adapter):
         mac = adapter._mac_address
         with self._lock:
             if mac in self._devices:
                 del self._devices[mac]
+            
+            # Cancel the task associated with this device
+            task = self._tasks.pop(mac, None)
+            if task and self._loop and self._loop.is_running():
+                self._loop.call_soon_threadsafe(task.cancel)
+                
             if not self._devices:
                 self._running = False
 
@@ -186,13 +197,34 @@ class _BLEManager:
         with self._lock:
             # Schedule connection for all currently registered devices
             for mac in list(self._devices.keys()):
-                self._loop.create_task(self._connect_and_stream(mac))
+                task = self._loop.create_task(self._connect_and_stream(mac))
+                self._tasks[mac] = task
             
         try:
             self._loop.run_until_complete(self._keep_alive())
+            
+            # Now self._running is False. Wait for tasks to exit normally to disconnect clients cleanly.
+            with self._lock:
+                active_tasks = list(self._tasks.values())
+            
+            if active_tasks:
+                LOGGER.info(f"[BLEManager] Waiting for {len(active_tasks)} BLE task(s) to exit normally...")
+                done, pending = self._loop.run_until_complete(
+                    asyncio.wait(active_tasks, timeout=3.0)
+                )
+                
+                if pending:
+                    LOGGER.warning(f"[BLEManager] {len(pending)} BLE task(s) did not exit in time. Cancelling them...")
+                    for task in pending:
+                        task.cancel()
+                    self._loop.run_until_complete(
+                        asyncio.wait(pending, timeout=2.0)
+                    )
         except Exception as e:
             LOGGER.error(f"[BLEManager] Event loop exception: {e}")
         finally:
+            with self._lock:
+                self._tasks.clear()
             self._loop.close()
             self._loop = None
 
@@ -212,42 +244,44 @@ class _BLEManager:
             if adapter:
                 adapter._parse_ble_data(data)
 
-        while self._running:
-            with self._lock:
-                if mac not in self._devices:
-                    break
-                adapter = self._devices[mac]
-                
-            try:
-                LOGGER.info(f"[BLEManager] BLE Connecting to {mac}...")
-                async with BleakClient(mac) as client:
-                    if client.is_connected:
-                        LOGGER.info(f"[BLEManager] BLE Connected to {mac}.")
-                        with adapter._lock:
-                            adapter._is_streaming = True
-                        await client.start_notify(DATA_UUID, notification_handler)
-                        while self._running and client.is_connected:
-                            with self._lock:
-                                if mac not in self._devices:
-                                    break
-                            await asyncio.sleep(0.1)
+        try:
+            while self._running:
+                with self._lock:
+                    if mac not in self._devices:
+                        break
+                    adapter = self._devices[mac]
+                    
+                try:
+                    LOGGER.info(f"[BLEManager] BLE Connecting to {mac}...")
+                    async with BleakClient(mac) as client:
                         if client.is_connected:
-                            await client.stop_notify(DATA_UUID)
+                            LOGGER.info(f"[BLEManager] BLE Connected to {mac}.")
+                            with adapter._lock:
+                                adapter._is_streaming = True
+                            await client.start_notify(DATA_UUID, notification_handler)
+                            while self._running and client.is_connected:
+                                with self._lock:
+                                    if mac not in self._devices:
+                                        break
+                                await asyncio.sleep(0.1)
+                            if client.is_connected:
+                                await client.stop_notify(DATA_UUID)
+                    LOGGER.warning(f"[BLEManager] BLE Connection lost/closed for {mac}.")
+                except Exception as e:
+                    LOGGER.error(f"[BLEManager] BLE Connection error for {mac}: {e}. Retrying in 2 seconds...")
+                    # Sleep in small steps to remain responsive to shutdown
+                    for _ in range(20):
+                        if not self._running:
+                            break
+                        await asyncio.sleep(0.1)
+        finally:
+            LOGGER.info(f"[BLEManager] BLE cleaning up stream for {mac}...")
+            with self._lock:
+                adapter = self._devices.get(mac)
+                self._tasks.pop(mac, None)
+            if adapter:
                 with adapter._lock:
                     adapter._is_streaming = False
-                with self._lock:
-                    if mac not in self._devices:
-                        break
-                LOGGER.warning(f"[BLEManager] BLE Connection lost to {mac}, retrying in 2 seconds...")
-                await asyncio.sleep(2.0)
-            except Exception as e:
-                with adapter._lock:
-                    adapter._is_streaming = False
-                with self._lock:
-                    if mac not in self._devices:
-                        break
-                LOGGER.error(f"[BLEManager] BLE Connection error for {mac}: {e}. Retrying in 2 seconds...")
-                await asyncio.sleep(2.0)
 
 
 class WitMotionIMUAdapter(IMUBase):
