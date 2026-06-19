@@ -135,6 +135,121 @@ class BNO055Adapter(IMUBase): # Inherit from IMUBase directly to bypass BNO055's
         self._is_streaming = False
 
 
+class _BLEManager:
+    _instance = None
+    _lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+    def __init__(self):
+        self._devices = {}  # mac_address -> WitMotionIMUAdapter instance
+        self._thread = None
+        self._loop = None
+        self._running = False
+        self._lock = threading.Lock()
+
+    def register_device(self, adapter):
+        mac = adapter._mac_address
+        if not mac:
+            return
+        
+        with self._lock:
+            self._devices[mac] = adapter
+            
+            # Start the background thread if not already running
+            if not self._thread or not self._thread.is_alive():
+                self._running = True
+                self._thread = threading.Thread(target=self._run_event_loop, daemon=True)
+                self._thread.start()
+            else:
+                # If loop is already running, schedule the new connection task on it
+                if self._loop and self._loop.is_running():
+                    asyncio.run_coroutine_threadsafe(self._connect_and_stream(mac), self._loop)
+
+    def unregister_device(self, adapter):
+        mac = adapter._mac_address
+        with self._lock:
+            if mac in self._devices:
+                del self._devices[mac]
+            if not self._devices:
+                self._running = False
+
+    def _run_event_loop(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        
+        with self._lock:
+            # Schedule connection for all currently registered devices
+            for mac in list(self._devices.keys()):
+                self._loop.create_task(self._connect_and_stream(mac))
+            
+        try:
+            self._loop.run_until_complete(self._keep_alive())
+        except Exception as e:
+            LOGGER.error(f"[BLEManager] Event loop exception: {e}")
+        finally:
+            self._loop.close()
+            self._loop = None
+
+    async def _keep_alive(self):
+        while self._running:
+            await asyncio.sleep(0.1)
+
+    async def _connect_and_stream(self, mac):
+        from bleak import BleakClient
+        
+        DATA_UUID = "0000ffe4-0000-1000-8000-00805f9a34fb"
+        
+        def notification_handler(sender, data):
+            # Fetch under lock to avoid race conditions
+            with self._lock:
+                adapter = self._devices.get(mac)
+            if adapter:
+                adapter._parse_ble_data(data)
+
+        while self._running:
+            with self._lock:
+                if mac not in self._devices:
+                    break
+                adapter = self._devices[mac]
+                
+            try:
+                LOGGER.info(f"[BLEManager] BLE Connecting to {mac}...")
+                async with BleakClient(mac) as client:
+                    if client.is_connected:
+                        LOGGER.info(f"[BLEManager] BLE Connected to {mac}.")
+                        with adapter._lock:
+                            adapter._is_streaming = True
+                        await client.start_notify(DATA_UUID, notification_handler)
+                        while self._running and client.is_connected:
+                            with self._lock:
+                                if mac not in self._devices:
+                                    break
+                            await asyncio.sleep(0.1)
+                        if client.is_connected:
+                            await client.stop_notify(DATA_UUID)
+                with adapter._lock:
+                    adapter._is_streaming = False
+                with self._lock:
+                    if mac not in self._devices:
+                        break
+                LOGGER.warning(f"[BLEManager] BLE Connection lost to {mac}, retrying in 2 seconds...")
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                with adapter._lock:
+                    adapter._is_streaming = False
+                with self._lock:
+                    if mac not in self._devices:
+                        break
+                LOGGER.error(f"[BLEManager] BLE Connection error for {mac}: {e}. Retrying in 2 seconds...")
+                await asyncio.sleep(2.0)
+
+
 class WitMotionIMUAdapter(IMUBase):
     """
     OSL Adapter for the WitMotion Bluetooth IMU (e.g. BWT901CL / BWT61CL).
@@ -197,11 +312,13 @@ class WitMotionIMUAdapter(IMUBase):
                 if not self._mac_address:
                     raise ValueError(f"[{self.tag}] MAC address is required for BLE connection.")
                 
-                # Start background asyncio loop thread for BLE
-                self._thread = threading.Thread(target=self._run_ble_loop, daemon=True)
-                self._thread.start()
-                self._is_streaming = True
-                LOGGER.info(f"[{self.tag}] Started BLE connection thread for {self._mac_address}.")
+                # Register with the shared BLE manager
+                _BLEManager.get_instance().register_device(self)
+                
+                # Wait for connection to establish (up to 5 seconds) so that is_streaming becomes True
+                start_wait = time.time()
+                while not self.is_streaming and (time.time() - start_wait) < 5.0:
+                    time.sleep(0.1)
                 
             else: # Serial mode
                 if self._mac_address and self._port and "rfcomm" in self._port:
@@ -259,51 +376,6 @@ class WitMotionIMUAdapter(IMUBase):
                     pass
                 self._serial = None
             self._is_streaming = False
-
-    def _run_ble_loop(self) -> None:
-        """Runs the asyncio event loop in a background thread for BLE connection."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(self._connect_and_stream_ble())
-        except Exception as e:
-            LOGGER.error(f"[{self.tag}] BLE Loop Thread Exception: {e}")
-        finally:
-            loop.close()
-
-    async def _connect_and_stream_ble(self) -> None:
-        """Asynchronously connects to the BLE sensor and handles updates."""
-        from bleak import BleakClient
-        
-        DATA_UUID = "0000ffe4-0000-1000-8000-00805f9a34fb"
-        
-        def notification_handler(sender, data):
-            self._parse_ble_data(data)
-
-        while self._running:
-            try:
-                LOGGER.info(f"[{self.tag}] BLE Connecting to {self._mac_address}...")
-                async with BleakClient(self._mac_address) as client:
-                    if client.is_connected:
-                        LOGGER.info(f"[{self.tag}] BLE Connected to {self._mac_address}.")
-                        with self._lock:
-                            self._is_streaming = True
-                        await client.start_notify(DATA_UUID, notification_handler)
-                        while self._running and client.is_connected:
-                            await asyncio.sleep(0.1)
-                        if client.is_connected:
-                            await client.stop_notify(DATA_UUID)
-                if self._running:
-                    LOGGER.warning(f"[{self.tag}] BLE Connection lost to {self._mac_address}, retrying in 2 seconds...")
-                    with self._lock:
-                        self._is_streaming = False
-                    await asyncio.sleep(2.0)
-            except Exception as e:
-                if self._running:
-                    LOGGER.error(f"[{self.tag}] BLE Connection error for {self._mac_address}: {e}. Retrying in 2 seconds...")
-                    with self._lock:
-                        self._is_streaming = False
-                    await asyncio.sleep(2.0)
 
     def _parse_ble_data(self, data: bytes) -> None:
         """Parse raw incoming bytes from BLE notification channel."""
@@ -464,26 +536,30 @@ class WitMotionIMUAdapter(IMUBase):
     def stop(self) -> None:
         """Safely stops the thread and closes connections."""
         self._running = False
-        if self._thread:
-            self._thread.join(timeout=1.0)
-        if self._serial:
-            try:
-                self._serial.close()
-            except Exception:
-                pass
-        if self._socket:
-            try:
-                self._socket.close()
-            except Exception:
-                pass
-            self._socket = None
+        
+        if self._connection_type == "ble":
+            _BLEManager.get_instance().unregister_device(self)
+        else:
+            if self._thread:
+                self._thread.join(timeout=1.0)
+            if self._serial:
+                try:
+                    self._serial.close()
+                except Exception:
+                    pass
+            if self._socket:
+                try:
+                    self._socket.close()
+                except Exception:
+                    pass
+                self._socket = None
 
-        # Clean up RFCOMM binding if we created one
-        if not self.is_offline and self._connection_type == "serial" and self._mac_address and self._port and "rfcomm" in self._port:
-            rfcomm_num = "".join(filter(str.isdigit, self._port))
-            if rfcomm_num:
-                LOGGER.info(f"[{self.tag}] Releasing RFCOMM binding for {self._port}...")
-                subprocess.run(["sudo", "rfcomm", "release", rfcomm_num], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Clean up RFCOMM binding if we created one
+            if not self.is_offline and self._connection_type == "serial" and self._mac_address and self._port and "rfcomm" in self._port:
+                rfcomm_num = "".join(filter(str.isdigit, self._port))
+                if rfcomm_num:
+                    LOGGER.info(f"[{self.tag}] Releasing RFCOMM binding for {self._port}...")
+                    subprocess.run(["sudo", "rfcomm", "release", rfcomm_num], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 
         self._is_streaming = False
 
