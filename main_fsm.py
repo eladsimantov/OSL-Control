@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """
-main_fsm.py - Entry point for running the OpenSourceLeg Knee FSM on the Raspberry Pi or offline.
+main_fsm.py - Entry point for running the Finite State Machine on the Raspberry Pi or offline.
 
 This script allows running either:
-1. Baseline FSM (calibration + holding position)
+1. Baseline FSM (calibration/config + holding position)
 2. Two-states Gait FSM (Stance/Swing transitions using load cell and timeouts)
+   - Supports selecting the Stance phase controller (Impedance holding or CVP controller)
+   - Supports dynamic offset adjustment in real-time
 
 All parameters (force thresholds, angles, CAN channel names) are defined inside:
 - src/fsm/baseline.py
 - src/fsm/two_states.py
 
 Usage:
-  # Run baseline FSM (will use settings from src/fsm/baseline.py)
+  # Run baseline FSM
   python main_fsm.py --mode baseline
+
+  # Run two-states FSM with standard impedance stance controller
+  python main_fsm.py --mode two_states
+
+  # Run two-states FSM with CVP stance controller and 5.0 degree offset
+  python main_fsm.py --mode two_states --stance-control cvp --stance-offset 5.0
 
   # Force offline simulation mode
   python main_fsm.py --mode two_states --offline
@@ -49,15 +57,44 @@ def main():
         help="Force offline simulation mode. If not specified, uses the value from the FSM config."
     )
 
+    parser.add_argument(
+        "--stance-control",
+        choices=["impedance", "cvp"],
+        default="impedance",
+        help="Stance controller type for two_states mode (default: impedance)."
+    )
+
+    parser.add_argument(
+        "--stance-offset",
+        type=float,
+        default=0.0,
+        help="Initial offset for the CVP stance controller in degrees (default: 0.0)."
+    )
+
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=None,
+        help="Maximum run duration in seconds (default: infinite)."
+    )
+
     args = parser.parse_args()
 
     # Pass the offline override if provided
     offline_override = True if args.offline else None
 
     if args.mode == "baseline":
-        run_baseline_fsm(offline=offline_override)
+        run_baseline_fsm(
+            offline=offline_override,
+            max_duration=args.duration
+        )
     elif args.mode == "two_states":
-        run_two_states_fsm(offline=offline_override)
+        run_two_states_fsm(
+            offline=offline_override,
+            max_duration=args.duration,
+            stance_control=args.stance_control,
+            stance_offset=args.stance_offset
+        )
 
 if __name__ == "__main__":
     main()
