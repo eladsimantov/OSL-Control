@@ -13,7 +13,7 @@ from opensourceleg.control.fsm import State, StateMachine
 from opensourceleg.utilities import SoftRealtimeLoop
 from opensourceleg.logging import LOGGER, LogLevel
 from src.drivers.odrive_can import ODriveCAN, ODriveMotor
-from src.fsm.controllers import HoldImpedanceController
+from src.enabletools import HoldImpedanceController
 
 # Default configurations - modify directly in this file
 CONFIG = {

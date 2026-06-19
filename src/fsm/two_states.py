@@ -16,7 +16,7 @@ from opensourceleg.logging import LOGGER, LogLevel
 from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 from src.adapters.loadcell import SRILoadCell_M8123B2
 from src.adapters.imu import WitMotionIMUAdapter
-from src.fsm.controllers import HoldImpedanceController, SwingTrajectoryController, CVPController
+from src.enabletools import HoldImpedanceController, SwingTrajectoryController, CVPController
 
 # Helper for non-blocking console input
 if sys.platform == "win32":
