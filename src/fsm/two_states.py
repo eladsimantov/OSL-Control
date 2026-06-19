@@ -54,7 +54,7 @@ CONFIG = {
     "unload_threshold": 20.0,      # N (Fz below this triggers Swing)
     "load_threshold": 60.0,        # N (Fz above this triggers Stance)
     "stance_knee_angle": 5.0,      # degrees (slight flexion for support)
-    "peak_flexion_angle": 40.0,    # degrees (peak flexion during swing)
+    "peak_flexion_angle": 20.0,    # degrees (peak flexion during swing)
     "peak_flexion_time": 0.25,     # seconds into swing to reach peak flexion
     "max_swing_time": 0.55,        # seconds (safety swing timeout)
 }
