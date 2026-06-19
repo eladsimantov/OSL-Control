@@ -112,6 +112,9 @@ class CVPController(BaseController):
         self.foot_imu_axis = foot_imu_axis
         
         # Set default/representative V and mu if not provided
+        self.thigh_bias = 0.0
+        self.foot_bias = 0.0
+
         if V is None:
             # Let's use a plane where z = x + y -> x + y - z = 0
             # Normal vector: [1, 1, -1] / sqrt(3)
@@ -126,6 +129,11 @@ class CVPController(BaseController):
         else:
             self.mu = mu
 
+    def set_biases(self, thigh_bias: float, foot_bias: float) -> None:
+        """Set software calibration/zeroing offsets for the IMUs."""
+        self.thigh_bias = thigh_bias
+        self.foot_bias = foot_bias
+
     def _get_imu_angle(self, imu, axis: str) -> float:
         """Helper to get angle from IMU based on selected axis."""
         if axis == 'x':
@@ -137,9 +145,9 @@ class CVPController(BaseController):
         return imu.euler_y
 
     def update(self, motor, thigh_imu, foot_imu, loadcell, t: float, state_time: float) -> None:
-        # Read elevation angles from IMUs in degrees
-        X_t = self._get_imu_angle(thigh_imu, self.thigh_imu_axis)
-        X_f = self._get_imu_angle(foot_imu, self.foot_imu_axis)
+        # Read elevation angles from IMUs in degrees, subtracting software calibration tare
+        X_t = self._get_imu_angle(thigh_imu, self.thigh_imu_axis) - self.thigh_bias
+        X_f = self._get_imu_angle(foot_imu, self.foot_imu_axis) - self.foot_bias
         
         # Compute shank elevation using CVP
         X_s = cvp_controller(X_t, X_f, self.V, self.mu)

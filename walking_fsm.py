@@ -10,6 +10,7 @@ import os
 import sys
 import math
 import select
+import time
 import numpy as np
 
 # Ensure project paths are resolved
@@ -29,6 +30,10 @@ BITRATE = 1000000
 MOTOR_ID = 0
 GEAR_RATIO = 40.0
 LOOP_HZ = 100.0
+
+# IMU Orientation Axes (choose 'x', 'y', or 'z' depending on how you mount them)
+THIGH_IMU_AXIS = "y"
+FOOT_IMU_AXIS = "y"
 
 # Gait triggers
 UNLOAD_THRESHOLD = 20.0  # N (Fz below this triggers Swing)
@@ -89,7 +94,12 @@ def main():
     # Initialize controllers
     global STANCE_OFFSET
     if STANCE_CONTROL == "cvp":
-        stance_controller = CVPController(kp=KP, kd=KD, offset_deg=STANCE_OFFSET)
+        stance_controller = CVPController(
+            kp=KP, kd=KD, 
+            offset_deg=STANCE_OFFSET,
+            thigh_imu_axis=THIGH_IMU_AXIS,
+            foot_imu_axis=FOOT_IMU_AXIS
+        )
     else:
         stance_controller = HoldImpedanceController(kp=KP, kd=KD, deg_eq=STANCE_KNEE_ANGLE)
 
@@ -101,11 +111,49 @@ def main():
         max_swing_time=MAX_SWING_TIME
     )
 
+    # 2. IMU Software Calibration (Tare baselines to zero for straight upright posture)
+    if STANCE_CONTROL == "cvp":
+        print("\n" + "="*60)
+        print("          IMU CALIBRATION PHASE")
+        print("="*60)
+        print("1. Mount sensors securely on your leg.")
+        print("2. Stand upright, still, and keep your leg straight.")
+        input("--> Press [ENTER] to capture the straight baseline reference angles...")
+        
+        print("Calibrating IMUs (stay still)...")
+        thigh_angles = []
+        foot_angles = []
+        
+        # Average angles over 1.0 second (100 samples)
+        for _ in range(100):
+            thigh_imu.update()
+            foot_imu.update()
+            
+            # Helper to retrieve angle from selected axis
+            def get_angle(imu, axis):
+                if axis == 'x': return imu.euler_x
+                if axis == 'y': return imu.euler_y
+                if axis == 'z': return imu.euler_z
+                return imu.euler_y
+                
+            thigh_angles.append(get_angle(thigh_imu, THIGH_IMU_AXIS))
+            foot_angles.append(get_angle(foot_imu, FOOT_IMU_AXIS))
+            time.sleep(0.01)
+            
+        thigh_bias = float(np.mean(thigh_angles))
+        foot_bias = float(np.mean(foot_angles))
+        
+        stance_controller.set_biases(thigh_bias, foot_bias)
+        print(f"Calibration successful!")
+        print(f"  Thigh Baseline ({THIGH_IMU_AXIS.upper()} axis): {thigh_bias:+.2f}°")
+        print(f"  Foot Baseline ({FOOT_IMU_AXIS.upper()} axis): {foot_bias:+.2f}°")
+        print("="*60 + "\n")
+
     # State tracking
     state = "STANCE"
     state_start_time = 0.0
 
-    print("\nFSM ready. Starting control loop. Press Ctrl+C to exit.")
+    print("FSM ready. Starting control loop. Press Ctrl+C to exit.")
     print("Type '+' or '-' followed by Enter to step the CVP offset, or type a new float offset.")
 
     loop = SoftRealtimeLoop(dt=1.0 / LOOP_HZ)
@@ -161,9 +209,19 @@ def main():
             if round(t * LOOP_HZ) % 10 == 0:
                 pos = knee.get_position()
                 offset_str = f" | Offset: {STANCE_OFFSET:+.1f}°" if STANCE_CONTROL == "cvp" else ""
+                
+                # Zero-centered angles for printout
+                def get_angle(imu, axis):
+                    if axis == 'x': return imu.euler_x
+                    if axis == 'y': return imu.euler_y
+                    if axis == 'z': return imu.euler_z
+                    return imu.euler_y
+                t_ang = get_angle(thigh_imu, THIGH_IMU_AXIS) - (thigh_bias if STANCE_CONTROL == "cvp" else 0.0)
+                f_ang = get_angle(foot_imu, FOOT_IMU_AXIS) - (foot_bias if STANCE_CONTROL == "cvp" else 0.0)
+                
                 print(f"\r t={t:6.2f}s | State: {state:8} | Fz: {fz:6.1f}N | "
                       f"Knee Pos: {pos:5.1f}°{offset_str} | "
-                      f"Thigh Y: {thigh_imu.euler_y:5.1f}° | Foot Y: {foot_imu.euler_y:5.1f}°", end="", flush=True)
+                      f"Thigh ({THIGH_IMU_AXIS.upper()}): {t_ang:5.1f}° | Foot ({FOOT_IMU_AXIS.upper()}): {f_ang:5.1f}°", end="", flush=True)
 
     finally:
         print("\nCleaning up and idling motor...")
