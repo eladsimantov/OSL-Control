@@ -323,8 +323,9 @@ class TwoStatesFSM:
         # Update current state timing
         state_time = current_state_obj.current_time_in_state
 
-        # Evaluate transitions
-        self.sm.update(fz=fz_val, state_time=state_time)
+        # Evaluate transitions (only when not in terminal IDLE state)
+        if self.sm.current_state != self.idle_state:
+            self.sm.update(fz=fz_val, state_time=state_time)
 
         # Execute active controller logic
         if self.sm.current_state == self.stance_state:

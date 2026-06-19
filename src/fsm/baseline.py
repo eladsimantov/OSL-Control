@@ -157,8 +157,9 @@ class BaselineFSM:
         # Update current state timing
         state_time = self.sm.current_state.current_time_in_state
         
-        # Check transitions
-        self.sm.update(state_time=state_time)
+        # Check transitions (only from CALIBRATING state as HOLDING is a terminal state)
+        if self.sm.current_state == self.calibrating_state:
+            self.sm.update(state_time=state_time)
         
         # Execute active state logic
         if self.sm.current_state == self.holding_state:
