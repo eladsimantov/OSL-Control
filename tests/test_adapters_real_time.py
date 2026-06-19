@@ -40,10 +40,14 @@ if __name__ == "__main__":
     loadcell.start()
     loadcell.calibrate()
 
-    thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", port="/dev/rfcomm0")
-    foot_imu = WitMotionIMUAdapter(tag="Foot IMU",port="/dev/rfcomm1")
-    # thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21",port="/dev/rfcomm0")
-    # foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EC:8E:70:CE:63:24",port="/dev/rfcomm1")
+    # Initialize WitMotion IMU adapters
+    # Mode 1: Direct BLE connection (Recommended - no manual or sudo rfcomm commands needed)
+    thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21", connection_type="ble")
+    foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EC:8E:70:CE:63:24", connection_type="ble")
+
+    # Mode 2: Serial RFCOMM connection (with automatic sudo binding inside start())
+    # thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21", port="/dev/rfcomm0", connection_type="serial")
+    # foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EC:8E:70:CE:63:24", port="/dev/rfcomm1", connection_type="serial")
 
     try:
         print("[STATUS] Connecting to Bluetooth IMU on /dev/rfcomm0...")

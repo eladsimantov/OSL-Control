@@ -6,6 +6,8 @@ import serial
 import struct
 import math
 import time
+import asyncio
+import subprocess
 
 # OSL Imports
 from opensourceleg.sensors.base import IMUBase
@@ -140,8 +142,9 @@ class WitMotionIMUAdapter(IMUBase):
     Threading and Loop Execution Model:
     -----------------------------------
     1. Online Mode (Hardware Connected):
-       - A background thread (`_read_loop`) runs continuously to read serial bytes,
-         verify 11-byte checksums, parse incoming packets, and update the internal states.
+       - A background thread (`_read_loop` or BLE notifier) runs continuously to read
+         bytes (or receive BLE notifications), verify checksums/headers, parse incoming
+         packets, and update the internal states.
        - The properties (`euler_x`, `quat_w`, etc.) return these updated states instantly.
        - You do NOT need to call `update()` to get new hardware readings, as they update in the background.
     
@@ -159,12 +162,14 @@ class WitMotionIMUAdapter(IMUBase):
         mac_address: str = None,
         port: str = "/dev/rfcomm0",
         baudrate: int = 115200,
+        connection_type: str = "serial",
         offline: bool = False
     ) -> None:
         super().__init__(tag=tag, offline=offline)
         self._mac_address = mac_address
         self._port = port
         self._baudrate = baudrate
+        self._connection_type = connection_type.lower()
         self._gyro_data = [0.0, 0.0, 0.0]
         self._acc_data = [0.0, 0.0, 0.0]
         self._euler_data = [0.0, 0.0, 0.0]
@@ -179,50 +184,171 @@ class WitMotionIMUAdapter(IMUBase):
         self._lock = threading.Lock()
 
     def start(self) -> None:
-        """Connects to the Bluetooth device (directly via socket or serial port) and starts the background listener."""
+        """Connects to the Bluetooth device (directly via BLE, socket, or serial port) and starts the background listener."""
         if self.is_offline:
             self._is_streaming = True
             LOGGER.info(f"[{self.tag}] Started in OFFLINE mode (Simulation).")
             return
 
         try:
-            if self._mac_address:
-                import socket
-                if not hasattr(socket, 'AF_BLUETOOTH'):
-                    raise NotImplementedError(
-                        f"Direct Bluetooth connection is not supported on this OS. "
-                        f"Please pair the device at OS-level and use serial `port` parameter instead."
-                    )
-                
-                LOGGER.info(f"[{self.tag}] Connecting directly via Bluetooth RFCOMM socket to {self._mac_address}...")
-                self._socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
-                self._socket.settimeout(5.0)
-                # Channel 1 is standard for WitMotion SPP Bluetooth connection
-                self._socket.connect((self._mac_address, 1))
-                self._socket.settimeout(0.1)
-                self._using_socket = True
-                LOGGER.info(f"[{self.tag}] Bluetooth socket connection established.")
-            else:
-                # Open RFCOMM serial port
-                self._serial = serial.Serial(self._port, baudrate=self._baudrate, timeout=0.1)
-                self._using_socket = False
-                LOGGER.info(f"[{self.tag}] Bluetooth Serial opened on {self._port}")
-            
             self._running = True
-            # Start background reading thread
-            self._thread = threading.Thread(target=self._read_loop, daemon=True)
-            self._thread.start()
             
-            self._is_streaming = True
+            if self._connection_type == "ble":
+                if not self._mac_address:
+                    raise ValueError(f"[{self.tag}] MAC address is required for BLE connection.")
+                
+                # Start background asyncio loop thread for BLE
+                self._thread = threading.Thread(target=self._run_ble_loop, daemon=True)
+                self._thread.start()
+                self._is_streaming = True
+                LOGGER.info(f"[{self.tag}] Started BLE connection thread for {self._mac_address}.")
+                
+            else: # Serial mode
+                if self._mac_address and self._port and "rfcomm" in self._port:
+                    # Extract the RFCOMM device number, e.g., "/dev/rfcomm0" -> "0"
+                    rfcomm_num = "".join(filter(str.isdigit, self._port))
+                    if rfcomm_num:
+                        LOGGER.info(f"[{self.tag}] Ensuring RFCOMM binding for {self._port} to {self._mac_address}...")
+                        # Release first
+                        subprocess.run(["sudo", "rfcomm", "release", rfcomm_num], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        # Bind
+                        res = subprocess.run(["sudo", "rfcomm", "bind", rfcomm_num, self._mac_address], capture_output=True, text=True)
+                        if res.returncode != 0:
+                            LOGGER.warning(f"[{self.tag}] rfcomm bind command output: {res.stderr.strip()}")
+                
+                # Try to open serial port (or RFCOMM socket if mac_address is provided but no port is specified/not rfcomm)
+                if self._mac_address and (not self._port or "rfcomm" not in self._port):
+                    import socket
+                    if not hasattr(socket, 'AF_BLUETOOTH'):
+                        raise NotImplementedError(
+                            f"Direct RFCOMM socket connection is not supported on this OS. "
+                            f"Please pair the device at OS-level and use serial `port` parameter instead."
+                        )
+                    
+                    LOGGER.info(f"[{self.tag}] Connecting directly via RFCOMM socket to {self._mac_address}...")
+                    self._socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
+                    self._socket.settimeout(5.0)
+                    self._socket.connect((self._mac_address, 1))
+                    self._socket.settimeout(0.1)
+                    self._using_socket = True
+                    LOGGER.info(f"[{self.tag}] RFCOMM socket connection established.")
+                else:
+                    LOGGER.info(f"[{self.tag}] Opening Serial port on {self._port}...")
+                    self._serial = serial.Serial(self._port, baudrate=self._baudrate, timeout=0.1)
+                    self._using_socket = False
+                    LOGGER.info(f"[{self.tag}] Serial port opened on {self._port}")
+                
+                # Start background reading thread for Serial/Socket
+                self._thread = threading.Thread(target=self._read_loop, daemon=True)
+                self._thread.start()
+                self._is_streaming = True
+                
         except Exception as e:
-            LOGGER.error(f"[{self.tag}] Failed to open Bluetooth connection: {e}")
+            LOGGER.error(f"[{self.tag}] Failed to start connection: {e}")
+            self._running = False
             if self._socket:
                 try:
                     self._socket.close()
                 except Exception:
                     pass
                 self._socket = None
+            if self._serial:
+                try:
+                    self._serial.close()
+                except Exception:
+                    pass
+                self._serial = None
             self._is_streaming = False
+
+    def _run_ble_loop(self) -> None:
+        """Runs the asyncio event loop in a background thread for BLE connection."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self._connect_and_stream_ble())
+        except Exception as e:
+            LOGGER.error(f"[{self.tag}] BLE Loop Thread Exception: {e}")
+        finally:
+            loop.close()
+
+    async def _connect_and_stream_ble(self) -> None:
+        """Asynchronously connects to the BLE sensor and handles updates."""
+        from bleak import BleakClient
+        
+        DATA_UUID = "0000ffe4-0000-1000-8000-00805f9a34fb"
+        
+        def notification_handler(sender, data):
+            self._parse_ble_data(data)
+
+        while self._running:
+            try:
+                LOGGER.info(f"[{self.tag}] BLE Connecting to {self._mac_address}...")
+                async with BleakClient(self._mac_address) as client:
+                    if client.is_connected:
+                        LOGGER.info(f"[{self.tag}] BLE Connected to {self._mac_address}.")
+                        with self._lock:
+                            self._is_streaming = True
+                        await client.start_notify(DATA_UUID, notification_handler)
+                        while self._running and client.is_connected:
+                            await asyncio.sleep(0.1)
+                        if client.is_connected:
+                            await client.stop_notify(DATA_UUID)
+                if self._running:
+                    LOGGER.warning(f"[{self.tag}] BLE Connection lost to {self._mac_address}, retrying in 2 seconds...")
+                    with self._lock:
+                        self._is_streaming = False
+                    await asyncio.sleep(2.0)
+            except Exception as e:
+                if self._running:
+                    LOGGER.error(f"[{self.tag}] BLE Connection error for {self._mac_address}: {e}. Retrying in 2 seconds...")
+                    with self._lock:
+                        self._is_streaming = False
+                    await asyncio.sleep(2.0)
+
+    def _parse_ble_data(self, data: bytes) -> None:
+        """Parse raw incoming bytes from BLE notification channel."""
+        idx = 0
+        while idx < len(data):
+            # Check for 20-byte high-speed combined broadcast frame: 0x55 0x61
+            if idx + 20 <= len(data) and data[idx] == 0x55 and data[idx+1] == 0x61:
+                packet = data[idx:idx+20]
+                try:
+                    ax, ay, az, gx, gy, gz, roll_raw, pitch_raw, yaw_raw = struct.unpack('<hhhhhhhhh', packet[2:20])
+                    
+                    # Convert raw values to standard OSL units (m/s^2, rad/s, degrees)
+                    ax_val = ax / 32768.0 * 16.0 * 9.80665
+                    ay_val = ay / 32768.0 * 16.0 * 9.80665
+                    az_val = az / 32768.0 * 16.0 * 9.80665
+                    
+                    gx_val = gx / 32768.0 * 2000.0 * (math.pi / 180.0)
+                    gy_val = gy / 32768.0 * 2000.0 * (math.pi / 180.0)
+                    gz_val = gz / 32768.0 * 2000.0 * (math.pi / 180.0)
+                    
+                    roll = roll_raw / 32768.0 * 180.0
+                    pitch = pitch_raw / 32768.0 * 180.0
+                    yaw = yaw_raw / 32768.0 * 180.0
+                    
+                    with self._lock:
+                        self._acc_data = [ax_val, ay_val, az_val]
+                        self._gyro_data = [gx_val, gy_val, gz_val]
+                        self._euler_data = [yaw, pitch, roll] # (yaw, pitch, roll) to match _parse_packet
+                except Exception as e:
+                    LOGGER.warning(f"[{self.tag}] BLE parse 0x55 0x61 frame error: {e}")
+                idx += 20
+            # Check for standard 11-byte serial-style packet: starts with 0x55
+            elif idx + 11 <= len(data) and data[idx] == 0x55:
+                packet = data[idx:idx+11]
+                checksum = sum(packet[0:10]) & 0xFF
+                if checksum == packet[10]:
+                    try:
+                        self._parse_packet(packet)
+                    except Exception as e:
+                        LOGGER.warning(f"[{self.tag}] BLE parse 11-byte frame error: {e}")
+                    idx += 11
+                else:
+                    idx += 1
+            else:
+                idx += 1
 
     def _read_loop(self) -> None:
         """Background thread reading and parsing WitMotion packets continuously."""
@@ -248,19 +374,45 @@ class WitMotionIMUAdapter(IMUBase):
                         time.sleep(0.001)
                         continue
 
-                # WitMotion standard packets are exactly 11 bytes
+                # Process buffer
                 while len(buffer) >= 11:
                     if buffer[0] == 0x55:
-                        packet = buffer[:11]
-                        
-                        # Verify WitMotion checksum: sum of first 10 bytes masked with 0xFF
-                        checksum = sum(packet[0:10]) & 0xFF
-                        if checksum == packet[10]:
-                            self._parse_packet(packet)
-                            del buffer[:11]
+                        # Check for 20-byte high-speed combined broadcast frame: 0x55 0x61
+                        if len(buffer) >= 20 and buffer[1] == 0x61:
+                            packet = buffer[:20]
+                            try:
+                                ax, ay, az, gx, gy, gz, roll_raw, pitch_raw, yaw_raw = struct.unpack('<hhhhhhhhh', packet[2:20])
+                                
+                                ax_val = ax / 32768.0 * 16.0 * 9.80665
+                                ay_val = ay / 32768.0 * 16.0 * 9.80665
+                                az_val = az / 32768.0 * 16.0 * 9.80665
+                                
+                                gx_val = gx / 32768.0 * 2000.0 * (math.pi / 180.0)
+                                gy_val = gy / 32768.0 * 2000.0 * (math.pi / 180.0)
+                                gz_val = gz / 32768.0 * 2000.0 * (math.pi / 180.0)
+                                
+                                roll = roll_raw / 32768.0 * 180.0
+                                pitch = pitch_raw / 32768.0 * 180.0
+                                yaw = yaw_raw / 32768.0 * 180.0
+                                
+                                with self._lock:
+                                    self._acc_data = [ax_val, ay_val, az_val]
+                                    self._gyro_data = [gx_val, gy_val, gz_val]
+                                    self._euler_data = [yaw, pitch, roll]
+                            except Exception as e:
+                                LOGGER.warning(f"[{self.tag}] Serial parse 0x55 0x61 error: {e}")
+                            del buffer[:20]
                         else:
-                            # Checksum failed: shift by 1 byte to find next header alignment
-                            buffer.pop(0)
+                            packet = buffer[:11]
+                            
+                            # Verify WitMotion checksum: sum of first 10 bytes masked with 0xFF
+                            checksum = sum(packet[0:10]) & 0xFF
+                            if checksum == packet[10]:
+                                self._parse_packet(packet)
+                                del buffer[:11]
+                            else:
+                                # Checksum failed: shift by 1 byte to find next header alignment
+                                buffer.pop(0)
                     else:
                         buffer.pop(0)
             except Exception as e:
@@ -273,14 +425,12 @@ class WitMotionIMUAdapter(IMUBase):
         
         with self._lock:
             if flag == 0x51:  # Acceleration packet
-                # Raw acceleration range is typically +/- 16g
                 ax = struct.unpack('<h', packet[2:4])[0] / 32768.0 * 16.0 * 9.80665
                 ay = struct.unpack('<h', packet[4:6])[0] / 32768.0 * 16.0 * 9.80665
                 az = struct.unpack('<h', packet[6:8])[0] / 32768.0 * 16.0 * 9.80665
                 self._acc_data = [ax, ay, az]
                 
             elif flag == 0x52:  # Angular Velocity packet
-                # Raw gyro range is typically +/- 2000 deg/s. Convert to rad/s for OSL
                 gx = struct.unpack('<h', packet[2:4])[0] / 32768.0 * 2000.0 * (math.pi / 180.0)
                 gy = struct.unpack('<h', packet[4:6])[0] / 32768.0 * 2000.0 * (math.pi / 180.0)
                 gz = struct.unpack('<h', packet[6:8])[0] / 32768.0 * 2000.0 * (math.pi / 180.0)
@@ -308,7 +458,6 @@ class WitMotionIMUAdapter(IMUBase):
         """
         if self.is_offline:
             # Simulated fake data in offline mode
-            print("FAKE DATA!!!!")
             t = time.time() if hasattr(time, 'time') else 0.0
             self._euler_data = [10.0 * math.sin(t), 5.0 * math.cos(t), 20.0 * math.sin(0.5 * t)]
             
@@ -328,6 +477,14 @@ class WitMotionIMUAdapter(IMUBase):
             except Exception:
                 pass
             self._socket = None
+
+        # Clean up RFCOMM binding if we created one
+        if not self.is_offline and self._connection_type == "serial" and self._mac_address and self._port and "rfcomm" in self._port:
+            rfcomm_num = "".join(filter(str.isdigit, self._port))
+            if rfcomm_num:
+                LOGGER.info(f"[{self.tag}] Releasing RFCOMM binding for {self._port}...")
+                subprocess.run(["sudo", "rfcomm", "release", rfcomm_num], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
         self._is_streaming = False
 
     @property
