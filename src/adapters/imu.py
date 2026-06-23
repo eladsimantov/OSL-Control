@@ -268,9 +268,9 @@ class _BLEManager:
                                 await client.stop_notify(DATA_UUID)
                     LOGGER.warning(f"[BLEManager] BLE Connection lost/closed for {mac}.")
                 except Exception as e:
-                    LOGGER.error(f"[BLEManager] BLE Connection error for {mac}: {e}. Retrying in 2 seconds...")
+                    LOGGER.error(f"[BLEManager] BLE Connection error for {mac}: {e}. Retrying in 4 seconds...")
                     # Sleep in small steps to remain responsive to shutdown
-                    for _ in range(20):
+                    for _ in range(40):
                         if not self._running:
                             break
                         await asyncio.sleep(0.1)
