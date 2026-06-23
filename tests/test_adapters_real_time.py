@@ -10,6 +10,7 @@ Date: 2026-01-01
 
 import os
 import sys
+import time
 tests_path = os.path.dirname(os.path.abspath(__file__))
 project_path = os.path.join(tests_path, "..")
 sys.path.insert(0, project_path)
@@ -42,6 +43,8 @@ if __name__ == "__main__":
 
     # Initialize WitMotion IMU adapters
     # Mode 1: Direct BLE connection (Recommended - no manual or sudo rfcomm commands needed)
+    os.system(f"sudo rfkill block bluetooth") # restart Bluetooth on Pi
+    os.system(f"sudo rfkill unblock bluetooth") # restart Bluetooth on Pi
     thigh_imu = WitMotionIMUAdapter(tag="Thigh IMU", mac_address="EF:D5:AC:1A:0D:21", connection_type="ble")
     foot_imu = WitMotionIMUAdapter(tag="Foot IMU", mac_address="EC:8E:70:CE:63:24", connection_type="ble")
 
@@ -67,6 +70,7 @@ if __name__ == "__main__":
 
     # --- One-time motor setup (before the loop) ---
     knee.idle()
+    time.sleep(0.3)
     knee.set_limit_current(10, 30)
     knee.closed_loop()
     knee.torque_control()

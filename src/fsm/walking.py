@@ -32,7 +32,7 @@ BODY_WEIGHT = 10 * 9.8  # 98.0 N
 # STATE 1: EARLY STANCE
 KNEE_K_ESTANCE = 0.02
 KNEE_B_ESTANCE = 0.0006
-KNEE_THETA_ESTANCE = 5.0
+KNEE_THETA_ESTANCE = 3.0
 LOAD_LSTANCE: float = 1.0 * BODY_WEIGHT * 0.25
 
 # STATE 2: LATE STANCE
@@ -45,7 +45,7 @@ LOAD_ESWING: float = 1.0 * BODY_WEIGHT * 0.15
 KNEE_K_ESWING = 0.008
 KNEE_B_ESWING = 0.000012
 KNEE_THETA_ESWING = 60.0
-KNEE_THETA_ESWING_TO_LSWING = 50.0  # degrees
+KNEE_THETA_ESWING_TO_LSWING = 40.0  # degrees
 KNEE_DTHETA_ESWING_TO_LSWING = 170.0  # deg/s (~3.0 rad/s)
 
 # STATE 4: LATE SWING
@@ -88,7 +88,7 @@ def create_simple_walking_fsm() -> StateMachine:
 
     # Transition criteria functions receiving kwargs directly
     def estance_to_lstance(fz: float, thigh_pitch: float, foot_pitch: float) -> bool:
-        return bool(fz > 30.0 and thigh_pitch > 5.0 and foot_pitch < -2.0)
+        return bool(fz > 30.0 and thigh_pitch > 5.0)
 
     def lstance_to_eswing(fz: float) -> bool:
         return bool(fz < LOAD_ESWING)
@@ -142,7 +142,8 @@ def run_walking_fsm(max_duration: float = None):
     thigh_imu_mac = "EF:D5:AC:1A:0D:21"
     foot_imu_mac = "EC:8E:70:CE:63:24"
 
-    LOGGER.set_stream_level(LogLevel.DEBUG)
+    # LOGGER.set_stream_level(LogLevel.DEBUG)
+    LOGGER.set_stream_level(LogLevel.ERROR)
     LOGGER.info("--- Starting Knee-Only Walking FSM (Direct Data Flow) ---")
 
     # 1. Bring up CAN Link
@@ -166,6 +167,9 @@ def run_walking_fsm(max_duration: float = None):
         offline=False
     )
 
+    os.system(f"sudo rfkill block bluetooth") 
+    os.system(f"sudo rfkill unblock bluetooth") # restart Bluetooth on Pi
+
     thigh_imu = WitMotionIMUAdapter(
         tag="Thigh IMU",
         mac_address=thigh_imu_mac,
@@ -187,8 +191,10 @@ def run_walking_fsm(max_duration: float = None):
 
     # ODrive closed-loop setup
     knee_motor.idle()
+    time.sleep(0.2)  # Allow time for motor to idle
     knee_motor.set_limit_current(10, 30)
     knee_motor.closed_loop()
+    time.sleep(0.2)  # Allow time for motor to enter closed-loop
     knee_motor.torque_control()
 
     osl_fsm = create_simple_walking_fsm()
@@ -249,6 +255,7 @@ def run_walking_fsm(max_duration: float = None):
         LOGGER.info("\nCleaning up and idling motor...")
         try:
             knee_motor.idle()
+            time.sleep(0.2)  # Allow time for motor to idle
         except Exception:
             pass
         try:
