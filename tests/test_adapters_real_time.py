@@ -60,6 +60,11 @@ if __name__ == "__main__":
         thigh_imu.start()
         foot_imu.start()
 
+    print("[STATUS] Calibrating IMUs... Keep them stationary.")
+    thigh_imu.calibrate()
+    foot_imu.calibrate()
+    print("[STATUS] IMU calibration complete.")
+
     # --- One-time motor setup (before the loop) ---
     knee.idle()
     knee.set_limit_current(10, 30)

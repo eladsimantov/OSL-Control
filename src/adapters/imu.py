@@ -331,6 +331,8 @@ class WitMotionIMUAdapter(IMUBase):
         self._thread = None
         self._running = False
         self._lock = threading.Lock()
+        self._offset = [0.0, 0.0, 0.0]
+        self._is_calibrated = False
 
     def start(self) -> None:
         """Connects to the Bluetooth device (directly via BLE, socket, or serial port) and starts the background listener."""
@@ -596,13 +598,46 @@ class WitMotionIMUAdapter(IMUBase):
                 
         self._is_streaming = False
 
+    def calibrate(self, n_samples: int = 500) -> None:
+        """Perform a software zeroing routine by averaging samples."""
+        LOGGER.info(f"[{self.tag}] Starting zeroing routine. Ensure the sensor is stationary.")
+        
+        samples = []
+        for _ in range(n_samples):
+            if self.is_offline:
+                self.update()
+            
+            with self._lock:
+                samples.append(list(self._euler_data))
+            
+            time.sleep(0.005)
+            
+        with self._lock:
+            self._offset = np.mean(samples, axis=0).tolist()
+            self._is_calibrated = True
+        LOGGER.info(f"[{self.tag}] Zeroing complete. Offsets: {self._offset}")
+
+    def reset(self) -> None:
+        """Resets the offsets."""
+        with self._lock:
+            self._offset = [0.0, 0.0, 0.0]
+            self._is_calibrated = False
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self._is_calibrated
+
     @property
     def data(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "acc": list(self._acc_data),
                 "gyro": list(self._gyro_data),
-                "euler": list(self._euler_data),
+                "euler": [
+                    self._euler_data[0] - self._offset[0],
+                    self._euler_data[1] - self._offset[1],
+                    self._euler_data[2] - self._offset[2]
+                ],
                 "quat": list(self._quat_data)
             }
 
@@ -629,13 +664,13 @@ class WitMotionIMUAdapter(IMUBase):
         
     @property
     def euler_x(self) -> float:
-        with self._lock: return self._euler_data[0]
+        with self._lock: return self._euler_data[0] - self._offset[0]
     @property
     def euler_y(self) -> float:
-        with self._lock: return self._euler_data[1]
+        with self._lock: return self._euler_data[1] - self._offset[1]
     @property
     def euler_z(self) -> float:
-        with self._lock: return self._euler_data[2]
+        with self._lock: return self._euler_data[2] - self._offset[2]
         
     @property
     def quat_w(self) -> float:
