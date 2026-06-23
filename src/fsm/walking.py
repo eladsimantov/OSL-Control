@@ -25,7 +25,7 @@ def get_keypress():
     return None
 
 # ------------- TUNABLE FSM PARAMETERS ---------------- #
-GEAR_RATIO = 40.0
+GEAR_RATIO = 41.5
 FREQUENCY = 100.0
 BODY_WEIGHT = 10 * 9.8  # 98.0 N
 
