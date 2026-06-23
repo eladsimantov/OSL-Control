@@ -27,13 +27,13 @@ if __name__ == "__main__":
     motor_node_id = 0
     CAN_CH = 'can0'
     BITRATE = 1000000  # Default is 1Mb/s 
-    can1 = ODriveCAN(node_id=motor_node_id,dbc_path=dbc_path,bus_name=CAN_CH)
-    knee = ODriveMotor(can1, name="knee", gear_ratio=40) 
-
-    # USB2CAN adapter settings
+    # USB2CAN adapter settings (Must be done before ODriveCAN connects)
     os.system(f"sudo ip link set {CAN_CH} down")
     os.system(f"sudo ip link set {CAN_CH} up type can bitrate {BITRATE} sample-point 0.750")
     os.system(f"sudo ip link set {CAN_CH} txqueuelen 1000") # Set the queue length to 1000 so the USB buffer doesn't overflow
+
+    can1 = ODriveCAN(node_id=motor_node_id,dbc_path=dbc_path,bus_name=CAN_CH)
+    knee = ODriveMotor(can1, name="knee", gear_ratio=40) 
 
     # Initialize loadcell (uses CAN filters so ODrive traffic is ignored)
     loadcell = SRILoadCell_M8123B2(tag="Shank LC", channel=CAN_CH)
