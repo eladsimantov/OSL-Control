@@ -437,7 +437,7 @@ class WitMotionIMUAdapter(IMUBase):
                     with self._lock:
                         self._acc_data = [ax_val, ay_val, az_val]
                         self._gyro_data = [gx_val, gy_val, gz_val]
-                        self._euler_data = [yaw, pitch, roll] # (yaw, pitch, roll) to match _parse_packet
+                        self._euler_data = [roll, pitch, yaw] # (roll, pitch, yaw)
                 except Exception as e:
                     LOGGER.warning(f"[{self.tag}] BLE parse 0x55 0x61 frame error: {e}")
                 idx += 20
@@ -504,7 +504,7 @@ class WitMotionIMUAdapter(IMUBase):
                                 with self._lock:
                                     self._acc_data = [ax_val, ay_val, az_val]
                                     self._gyro_data = [gx_val, gy_val, gz_val]
-                                    self._euler_data = [yaw, pitch, roll]
+                                    self._euler_data = [roll, pitch, yaw]
                             except Exception as e:
                                 LOGGER.warning(f"[{self.tag}] Serial parse 0x55 0x61 error: {e}")
                             del buffer[:20]
@@ -542,11 +542,10 @@ class WitMotionIMUAdapter(IMUBase):
                 gz = struct.unpack('<h', packet[6:8])[0] / 32768.0 * 2000.0 * (math.pi / 180.0)
                 self._gyro_data = [gx, gy, gz]
                 
-            elif flag == 0x53:  # Euler Angles packet (Roll, Pitch, Yaw)
                 roll = struct.unpack('<h', packet[2:4])[0] / 32768.0 * 180.0
                 pitch = struct.unpack('<h', packet[4:6])[0] / 32768.0 * 180.0
                 yaw = struct.unpack('<h', packet[6:8])[0] / 32768.0 * 180.0
-                self._euler_data = [yaw, pitch, roll]  # Match OSL property convention (yaw, pitch, roll)
+                self._euler_data = [roll, pitch, yaw]  # Match standard roll, pitch, yaw order
                 
             elif flag == 0x59:  # Quaternion packet (q0, q1, q2, q3)
                 q0 = struct.unpack('<h', packet[2:4])[0] / 32768.0  # w
