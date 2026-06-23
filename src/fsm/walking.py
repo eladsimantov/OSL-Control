@@ -182,8 +182,13 @@ def run_walking_fsm(max_duration: float = None):
 
     # Start sensor streams
     loadcell.start()
+    loadcell.calibrate()
+
     thigh_imu.start()
+    thigh_imu.calibrate()
+    time.sleep(3)
     foot_imu.start()
+    foot_imu.calibrate()
 
     # ODrive closed-loop setup
     knee_motor.idle()
@@ -192,11 +197,6 @@ def run_walking_fsm(max_duration: float = None):
     knee_motor.torque_control()
 
     osl_fsm = create_simple_walking_fsm()
-
-    # Homing/calibration
-    knee_motor.closed_loop()
-    knee_motor.torque_control()
-    loadcell.calibrate()
 
     clock = SoftRealtimeLoop(dt=1.0 / FREQUENCY, report=True)
 
@@ -249,6 +249,7 @@ def run_walking_fsm(max_duration: float = None):
         LOGGER.info("\nCleaning up and idling motor...")
         try:
             knee_motor.idle()
+            time.sleep(0.2)  # Give CAN bus time to transmit the idle command before shutdown
         except Exception:
             pass
         try:
