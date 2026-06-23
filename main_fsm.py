@@ -34,6 +34,7 @@ if project_path not in sys.path:
 
 from src.fsm.baseline import run_baseline_fsm
 from src.fsm.two_states import run_two_states_fsm
+from src.fsm.walking import run_walking_fsm
 
 def main():
     parser = argparse.ArgumentParser(
@@ -42,7 +43,7 @@ def main():
 
     parser.add_argument(
         "--mode",
-        choices=["baseline", "two_states"],
+        choices=["baseline", "two_states", "walking"],
         default="baseline",
         help="Which state machine to run."
     )
@@ -79,6 +80,10 @@ def main():
             max_duration=args.duration,
             stance_control=args.stance_control,
             stance_offset=args.stance_offset
+        )
+    elif args.mode == "walking":
+        run_walking_fsm(
+            max_duration=args.duration
         )
 
 if __name__ == "__main__":
