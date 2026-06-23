@@ -24,12 +24,10 @@ CONFIG = {
     "loop_hz": 100.0,
     "calibrate_time": 2.0,  # Configuration state time
     "target_angle": 0.0,    # Target hold angle in degrees
-    "offline": False
 }
 
 class BaselineFSM:
     def __init__(self, offline: bool = False, max_duration: float = None):
-        self.offline = offline
         self.max_duration = max_duration
         self.config = CONFIG
 
@@ -42,43 +40,23 @@ class BaselineFSM:
         self.target_angle = self.config["target_angle"]
 
         LOGGER.set_stream_level(LogLevel.DEBUG)
-        LOGGER.info(f"--- Starting Baseline FSM (Offline={self.offline}) ---")
+        LOGGER.info("--- Starting Baseline FSM ---")
         LOGGER.info(f"Target Hold Angle: {self.target_angle}°")
 
-        # 1. Bring up CAN Link (only if online and Linux)
-        if not self.offline and sys.platform.startswith("linux"):
-            LOGGER.info(f"Setting up CAN link {self.can_interface} at {self.bitrate} bps...")
-            os.system(f"sudo ip link set {self.can_interface} down")
-            os.system(f"sudo ip link set {self.can_interface} up type can bitrate {self.bitrate} sample-point 0.750")
-            os.system(f"sudo ip link set {self.can_interface} txqueuelen 1000")
+        # 1. Bring up CAN Link
+        LOGGER.info(f"Setting up CAN link {self.can_interface} at {self.bitrate} bps...")
+        os.system(f"sudo ip link set {self.can_interface} down")
+        os.system(f"sudo ip link set {self.can_interface} up type can bitrate {self.bitrate} sample-point 0.750")
+        os.system(f"sudo ip link set {self.can_interface} txqueuelen 1000")
 
-        # 2. Initialize CAN Bus (if online)
-        if self.offline:
-            can_bus = None
-        else:
-            try:
-                LOGGER.info(f"Initializing CAN interface {self.can_interface}...")
-                dir_path = os.path.dirname(os.path.abspath(__file__))
-                dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
-                can_bus = ODriveCAN(bus_name=self.can_interface, node_id=node_id, dbc_path=dbc_path)
-            except Exception as e:
-                LOGGER.error(f"Failed to connect to hardware CAN: {e}. Switching to offline mode.")
-                can_bus = None
-                self.offline = True
+        # 2. Initialize CAN Bus
+        LOGGER.info(f"Initializing CAN interface {self.can_interface}...")
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
+        can_bus = ODriveCAN(bus_name=self.can_interface, node_id=node_id, dbc_path=dbc_path)
 
         # Initialize ODriveMotor driver
-        if self.offline:
-            self.knee = ODriveMotor(can_interface=None, name="knee", gear_ratio=gear_ratio)
-            self.knee.alive = True
-            self._mock_pos = 0.0
-            self._mock_vel = 0.0
-            self._mock_curr = 0.0
-            self.knee.get_position = lambda: self._mock_pos
-            self.knee.get_velocity = lambda: self._mock_vel
-            self.knee.get_current = lambda: self._mock_curr
-            self.knee.set_impedance = lambda kp, kd, deg_eq, pos_deg=None, vel_dps=None: setattr(self, '_mock_pos', deg_eq)
-        else:
-            self.knee = ODriveMotor(can_bus, name="knee", gear_ratio=gear_ratio)
+        self.knee = ODriveMotor(can_bus, name="knee", gear_ratio=gear_ratio)
 
         # 3. Setup Controller
         self.controller = HoldImpedanceController(
@@ -91,11 +69,10 @@ class BaselineFSM:
         # State: CALIBRATING (Handles configuration state)
         def enter_calibrating(*args, **kwargs):
             LOGGER.info("[FSM STATE] -> CALIBRATING: Configuring ODrive loop states...")
-            if not self.offline:
-                self.knee.idle()
-                self.knee.set_limit_current(10, 30)
-                self.knee.closed_loop()
-                self.knee.torque_control()
+            self.knee.idle()
+            self.knee.set_limit_current(10, 30)
+            self.knee.closed_loop()
+            self.knee.torque_control()
 
         self.calibrating_state = State(
             name="CALIBRATING",
@@ -114,8 +91,7 @@ class BaselineFSM:
         # State: IDLE
         def enter_idle(*args, **kwargs):
             LOGGER.info("[FSM STATE] -> IDLE: Motor entered idle state.")
-            if not self.offline:
-                self.knee.idle()
+            self.knee.idle()
 
         self.idle_state = State(
             name="IDLE",
@@ -191,19 +167,16 @@ class BaselineFSM:
             self.knee.idle()
         except Exception:
             pass
-        if not self.offline and sys.platform.startswith("linux"):
-            os.system(f"sudo ip link set {self.can_interface} down")
+        os.system(f"sudo ip link set {self.can_interface} down")
         LOGGER.close()
         self.clock.stop()
         LOGGER.info("Shutdown complete.")
 
 
 def run_baseline_fsm(offline: bool = None, max_duration: float = None):
-    if offline is None:
-        offline = CONFIG["offline"]
     fsm = BaselineFSM(offline=offline, max_duration=max_duration)
     fsm.run()
 
 
 if __name__ == "__main__":
-    run_baseline_fsm(offline=True)
+    run_baseline_fsm()

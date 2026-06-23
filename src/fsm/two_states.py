@@ -19,23 +19,12 @@ from src.adapters.imu import WitMotionIMUAdapter
 from src.enabletools import HoldImpedanceController, SwingTrajectoryController, CVPController
 
 # Helper for non-blocking console input
-if sys.platform == "win32":
-    import msvcrt
-    def get_keypress():
-        if msvcrt.kbhit():
-            ch = msvcrt.getch()
-            try:
-                return ch.decode('utf-8', errors='ignore')
-            except Exception:
-                return None
-        return None
-else:
-    import select
-    def get_keypress():
-        dr, _, _ = select.select([sys.stdin], [], [], 0.0)
-        if dr:
-            return sys.stdin.readline().strip()
-        return None
+import select
+def get_keypress():
+    dr, _, _ = select.select([sys.stdin], [], [], 0.0)
+    if dr:
+        return sys.stdin.readline().strip()
+    return None
 
 # Default configurations - modify directly in this file
 CONFIG = {
@@ -46,7 +35,6 @@ CONFIG = {
     "gear_ratio": 40.0,
     "loop_hz": 100.0,
     "calibrate_time": 2.0,  # One-time motor configuration state time
-    "offline": False,
     "thigh_imu_mac": "EF:D5:AC:1A:0D:21",
     "foot_imu_mac": "EC:8E:70:CE:63:24",
 
@@ -62,7 +50,6 @@ CONFIG = {
 class TwoStatesFSM:
     def __init__(self, offline: bool = False, max_duration: float = None, 
                  stance_control: str = "impedance", stance_offset: float = 0.0):
-        self.offline = offline
         self.max_duration = max_duration
         self.config = CONFIG
         self.stance_control_type = stance_control.lower()
@@ -83,71 +70,49 @@ class TwoStatesFSM:
         self.max_swing_time = self.config["max_swing_time"]
 
         LOGGER.set_stream_level(LogLevel.DEBUG)
-        LOGGER.info(f"--- Starting Two-States Gait FSM (Offline={self.offline}) ---")
+        LOGGER.info("--- Starting Two-States Gait FSM ---")
         LOGGER.info(f"Stance Control: {self.stance_control_type.upper()} | Initial Offset: {self.stance_offset}°")
         LOGGER.info(f"Parameters:\n  Unload Thr: {self.unload_threshold}N | Load Thr: {self.load_threshold}N")
         LOGGER.info(f"  Stance Ang: {self.stance_knee_angle}° | Swing Peak: {self.peak_flexion_angle}° in {self.peak_flexion_time}s")
 
-        # 1. Bring up CAN Link (only if online and Linux)
-        if not self.offline and sys.platform.startswith("linux"):
-            LOGGER.info(f"Setting up CAN link {self.can_interface} at {self.bitrate} bps...")
-            os.system(f"sudo ip link set {self.can_interface} down")
-            os.system(f"sudo ip link set {self.can_interface} up type can bitrate {self.bitrate} sample-point 0.750")
-            os.system(f"sudo ip link set {self.can_interface} txqueuelen 1000")
+        # 1. Bring up CAN Link
+        LOGGER.info(f"Setting up CAN link {self.can_interface} at {self.bitrate} bps...")
+        os.system(f"sudo ip link set {self.can_interface} down")
+        os.system(f"sudo ip link set {self.can_interface} up type can bitrate {self.bitrate} sample-point 0.750")
+        os.system(f"sudo ip link set {self.can_interface} txqueuelen 1000")
 
-        # 2. Initialize CAN bus (if online) and adapters
-        if self.offline:
-            can_bus = None
-        else:
-            try:
-                LOGGER.info(f"Initializing ODrive CAN on {self.can_interface}...")
-                dir_path = os.path.dirname(os.path.abspath(__file__))
-                dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
-                can_bus = ODriveCAN(bus_name=self.can_interface, node_id=node_id_odrive, dbc_path=dbc_path)
-            except Exception as e:
-                LOGGER.error(f"Failed to connect to ODrive: {e}. Switching to offline.")
-                can_bus = None
-                self.offline = True
+        # 2. Initialize CAN bus and adapters
+        LOGGER.info(f"Initializing ODrive CAN on {self.can_interface}...")
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        dbc_path = os.path.abspath(os.path.join(dir_path, "..", "drivers", "odrive-cansimple.dbc"))
+        can_bus = ODriveCAN(bus_name=self.can_interface, node_id=node_id_odrive, dbc_path=dbc_path)
 
         # Initialize adapters (ODriveMotor used directly in degrees)
-        if self.offline:
-            self.knee = ODriveMotor(can_interface=None, name="knee", gear_ratio=gear_ratio)
-            # Mock variables for offline simulation
-            self.knee.alive = True
-            self._mock_pos = 0.0
-            self._mock_vel = 0.0
-            self._mock_curr = 0.0
-            self.knee.get_position = lambda: self._mock_pos
-            self.knee.get_velocity = lambda: self._mock_vel
-            self.knee.get_current = lambda: self._mock_curr
-            self.knee.set_impedance = lambda kp, kd, deg_eq, pos_deg=None, vel_dps=None: setattr(self, '_mock_pos', deg_eq)
-        else:
-            self.knee = ODriveMotor(can_interface=can_bus, name="knee", gear_ratio=gear_ratio)
+        self.knee = ODriveMotor(can_interface=can_bus, name="knee", gear_ratio=gear_ratio)
 
         self.loadcell = SRILoadCell_M8123B2(
             tag="loadcell",
             channel=self.can_interface,
-            offline=self.offline
+            offline=False
         )
 
         self.thigh_imu = WitMotionIMUAdapter(
             tag="Thigh IMU",
             mac_address=self.config["thigh_imu_mac"],
             connection_type="ble",
-            offline=self.offline
+            offline=False
         )
         
         self.foot_imu = WitMotionIMUAdapter(
             tag="Foot IMU",
             mac_address=self.config["foot_imu_mac"],
             connection_type="ble",
-            offline=self.offline
+            offline=False
         )
 
         # Start sensor streams
         self.loadcell.start()
-        if not self.offline:
-            self.loadcell.calibrate()
+        self.loadcell.calibrate()
 
         self.thigh_imu.start()
         self.foot_imu.start()
@@ -179,11 +144,10 @@ class TwoStatesFSM:
         # State: CALIBRATING
         def enter_calibrating(*args, **kwargs):
             LOGGER.info("[FSM STATE] -> CALIBRATING: Configuring ODrive loop states...")
-            if not self.offline:
-                self.knee.idle()
-                self.knee.set_limit_current(10, 30)
-                self.knee.closed_loop()
-                self.knee.torque_control()
+            self.knee.idle()
+            self.knee.set_limit_current(10, 30)
+            self.knee.closed_loop()
+            self.knee.torque_control()
 
         self.calibrating_state = State(
             name="CALIBRATING",
@@ -211,8 +175,7 @@ class TwoStatesFSM:
         # State: IDLE
         def enter_idle(*args, **kwargs):
             LOGGER.info("[FSM STATE] -> IDLE: Motor idled.")
-            if not self.offline:
-                self.knee.idle()
+            self.knee.idle()
 
         self.idle_state = State(
             name="IDLE",
@@ -266,7 +229,6 @@ class TwoStatesFSM:
 
         self.loop_dt = 1.0 / self.loop_hz
         self.clock = SoftRealtimeLoop(dt=self.loop_dt, report=True)
-        self.sim_stance_start = 0.0
 
     def update(self) -> int:
         t = self.clock.time_since_start
@@ -298,21 +260,6 @@ class TwoStatesFSM:
 
             if hasattr(self.stance_controller, 'offset_deg'):
                 self.stance_controller.offset_deg = self.stance_offset
-
-        # Offline simulation updates
-        if self.offline:
-            if current_state_obj == self.calibrating_state:
-                self.loadcell._data[2] = 120.0
-            elif current_state_obj == self.stance_state:
-                if self.sm.previous_state == self.calibrating_state or self.sm.previous_state == self.swing_state:
-                    self.sim_stance_start = t
-                elapsed_stance = t - self.sim_stance_start
-                self.loadcell._data[2] = max(10.0, 150.0 - (140.0 * (elapsed_stance / 1.2)))
-            elif current_state_obj == self.swing_state:
-                self.loadcell._data[2] = 5.0
-                state_time = current_state_obj.current_time_in_state
-                if state_time >= 0.45:
-                    self.loadcell._data[2] = 130.0
 
         # Update sensor readings
         self.loadcell.update()
@@ -375,19 +322,16 @@ class TwoStatesFSM:
             self.foot_imu.stop()
         except Exception:
             pass
-        if not self.offline and sys.platform.startswith("linux"):
-            os.system(f"sudo ip link set {self.can_interface} down")
+        os.system(f"sudo ip link set {self.can_interface} down")
         LOGGER.close()
         self.clock.stop()
         LOGGER.info("Shutdown complete.")
 
 def run_two_states_fsm(offline: bool = None, max_duration: float = None, 
                        stance_control: str = "impedance", stance_offset: float = 0.0):
-    if offline is None:
-        offline = CONFIG["offline"]
     fsm = TwoStatesFSM(offline=offline, max_duration=max_duration, 
                        stance_control=stance_control, stance_offset=stance_offset)
     fsm.run()
 
 if __name__ == "__main__":
-    run_two_states_fsm(offline=True)
+    run_two_states_fsm()

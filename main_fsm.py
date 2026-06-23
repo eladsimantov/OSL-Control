@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main_fsm.py - Entry point for running the Finite State Machine on the Raspberry Pi or offline.
+main_fsm.py - Entry point for running the Finite State Machine on the Raspberry Pi.
 
 This script allows running either:
 1. Baseline FSM (calibration/config + holding position)
@@ -21,9 +21,6 @@ Usage:
 
   # Run two-states FSM with CVP stance controller and 5.0 degree offset
   python main_fsm.py --mode two_states --stance-control cvp --stance-offset 5.0
-
-  # Force offline simulation mode
-  python main_fsm.py --mode two_states --offline
 """
 
 import argparse
@@ -49,13 +46,6 @@ def main():
         default="baseline",
         help="Which state machine to run."
     )
-    
-    parser.add_argument(
-        "--offline",
-        action="store_true",
-        default=None,
-        help="Force offline simulation mode. If not specified, uses the value from the FSM config."
-    )
 
     parser.add_argument(
         "--stance-control",
@@ -80,17 +70,12 @@ def main():
 
     args = parser.parse_args()
 
-    # Pass the offline override if provided
-    offline_override = True if args.offline else None
-
     if args.mode == "baseline":
         run_baseline_fsm(
-            offline=offline_override,
             max_duration=args.duration
         )
     elif args.mode == "two_states":
         run_two_states_fsm(
-            offline=offline_override,
             max_duration=args.duration,
             stance_control=args.stance_control,
             stance_offset=args.stance_offset
