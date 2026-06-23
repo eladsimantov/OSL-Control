@@ -105,6 +105,8 @@ if __name__ == "__main__":
         #   - Any exception
         print("\n\nStopping loop and moving Knee to Idle mode")
         knee.idle()
+        import time
+        time.sleep(0.2)  # Give CAN bus time to transmit the idle command before shutdown
         loadcell.stop()
         thigh_imu.stop()
         foot_imu.stop()
