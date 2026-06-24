@@ -47,7 +47,7 @@ THIGH_ELEVATION_LSTANCE_TO_ESWING: float = 0.00
 KNEE_K_ESWING = 0.008
 KNEE_B_ESWING = 0.000012
 KNEE_THETA_ESWING = 60.0
-KNEE_THETA_ESWING_TO_LSWING = 40.0  # degrees at least reached for late swing
+KNEE_THETA_ESWING_TO_LSWING = 50.0  # degrees at least reached for late swing
 KNEE_DTHETA_ESWING_TO_LSWING = 170.0  # deg/s (~3.0 rad/s)
 
 # STATE 4: LATE SWING
@@ -89,21 +89,21 @@ def create_simple_walking_fsm() -> StateMachine:
     )
 
     # Transition criteria functions receiving kwargs directly
-    def estance_to_lstance(fz: float, thigh_pitch: float, foot_pitch: float) -> bool:
+    def estance_to_lstance(fz: float, thigh_elevation: float, foot_elevation: float) -> bool:
         """
         Transition from early stance to late stance when the loadcell
         reads a force greater than a threshold (LOAD_LSTANCE) and
         the thigh elevation angle is below a threshold (THIGH_ELEVATION_ESTANCE_TO_LSTANCE).
         """
-        return bool(fz > LOAD_LSTANCE and thigh_pitch < THIGH_ELEVATION_ESTANCE_TO_LSTANCE)
+        return bool(fz > LOAD_LSTANCE and thigh_elevation < THIGH_ELEVATION_ESTANCE_TO_LSTANCE)
 
-    def lstance_to_eswing(fz: float, thigh_pitch: float) -> bool:
+    def lstance_to_eswing(fz: float, thigh_elevation: float) -> bool:
         """
         Transition from late stance to early swing when the loadcell
         reads a force less than a threshold (LOAD_ESWING) and
         the thigh elevation angle is below a threshold (THIGH_ELEVATION_LSTANCE_TO_ESWING).
         """
-        return bool(fz < LOAD_ESWING and thigh_pitch < THIGH_ELEVATION_LSTANCE_TO_ESWING)
+        return bool(fz < LOAD_ESWING and thigh_elevation < THIGH_ELEVATION_LSTANCE_TO_ESWING)
 
     def eswing_to_lswing(knee_pos: float, knee_vel: float) -> bool:
         return bool(
@@ -240,16 +240,16 @@ def run_walking_fsm(max_duration: float = None):
 
                 # Read parameters directly
                 fz = loadcell.fz
-                thigh_pitch = thigh_imu.euler_y
-                foot_pitch = foot_imu.euler_y
+                thigh_elevation = thigh_imu.euler_y
+                foot_elevation = foot_imu.euler_y
                 knee_pos = knee_motor.get_position()
                 knee_vel = knee_motor.get_velocity()
 
                 # Evaluate state transitions via kwargs
                 osl_fsm.update(
                     fz=fz,
-                    thigh_pitch=thigh_pitch,
-                    foot_pitch=foot_pitch,
+                    thigh_elevation=thigh_elevation,
+                    foot_elevation=foot_elevation,
                     knee_pos=knee_pos,
                     knee_vel=knee_vel
                 )
@@ -264,7 +264,7 @@ def run_walking_fsm(max_duration: float = None):
                 # Print telemetry periodically
                 if int(t * FREQUENCY) % 20 == 0:
                     print(f"\r t={t:5.2f}s | State: {osl_fsm.current_state.name:11} | Fz: {fz:6.1f}N | "
-                          f"Knee Pos: {knee_pos:6.1f}° | Thigh Pitch: {thigh_pitch:5.1f}° | Foot Pitch: {foot_pitch:5.1f}°", end='', flush=True)
+                          f"Knee Pos: {knee_pos:6.1f}° | Thigh: {thigh_elevation:5.1f}° | Foot: {foot_elevation:5.1f}°", end='', flush=True)
 
     except KeyboardInterrupt:
         LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
