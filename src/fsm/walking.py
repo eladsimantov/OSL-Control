@@ -27,32 +27,34 @@ def get_keypress():
 # ------------- TUNABLE FSM PARAMETERS ---------------- #
 GEAR_RATIO = 41.5
 FREQUENCY = 100.0
-BODY_WEIGHT = 10 * 9.8  # 98.0 N
+BODY_WEIGHT = 25 * 9.8  # 245.0 N
 
 # STATE 1: EARLY STANCE
 KNEE_K_ESTANCE = 0.02
 KNEE_B_ESTANCE = 0.0006
-KNEE_THETA_ESTANCE = 3.0
+KNEE_THETA_ESTANCE = 0.0
 LOAD_LSTANCE: float = 1.0 * BODY_WEIGHT * 0.25
+THIGH_ELEVATION_ESTANCE_TO_LSTANCE: float = 0.00
 
 # STATE 2: LATE STANCE
 KNEE_K_LSTANCE = 0.02
 KNEE_B_LSTANCE = 0.00024
 KNEE_THETA_LSTANCE = 8.0
-LOAD_ESWING: float = 1.0 * BODY_WEIGHT * 0.15
+LOAD_ESWING: float = 1.0 * BODY_WEIGHT * 0.1
+THIGH_ELEVATION_LSTANCE_TO_ESWING: float = 0.00
 
 # STATE 3: EARLY SWING
 KNEE_K_ESWING = 0.008
 KNEE_B_ESWING = 0.000012
 KNEE_THETA_ESWING = 60.0
-KNEE_THETA_ESWING_TO_LSWING = 40.0  # degrees
+KNEE_THETA_ESWING_TO_LSWING = 40.0  # degrees at least reached for late swing
 KNEE_DTHETA_ESWING_TO_LSWING = 170.0  # deg/s (~3.0 rad/s)
 
 # STATE 4: LATE SWING
 KNEE_K_LSWING = 0.0032
 KNEE_B_LSWING = 0.00072
 KNEE_THETA_LSWING = 5.0
-LOAD_ESTANCE: float = 1.0 * BODY_WEIGHT * 0.4
+LOAD_ESTANCE: float = 1.0 * BODY_WEIGHT * 0.15
 KNEE_THETA_LSWING_TO_ESTANCE = 30.0  # degrees
 
 # ---------------------------------------------------- #
@@ -88,10 +90,20 @@ def create_simple_walking_fsm() -> StateMachine:
 
     # Transition criteria functions receiving kwargs directly
     def estance_to_lstance(fz: float, thigh_pitch: float, foot_pitch: float) -> bool:
-        return bool(fz > 30.0 and thigh_pitch > 5.0)
+        """
+        Transition from early stance to late stance when the loadcell
+        reads a force greater than a threshold (LOAD_LSTANCE) and
+        the thigh elevation angle is below a threshold (THIGH_ELEVATION_ESTANCE_TO_LSTANCE).
+        """
+        return bool(fz > LOAD_LSTANCE and thigh_pitch < THIGH_ELEVATION_ESTANCE_TO_LSTANCE)
 
-    def lstance_to_eswing(fz: float) -> bool:
-        return bool(fz < LOAD_ESWING)
+    def lstance_to_eswing(fz: float, thigh_pitch: float) -> bool:
+        """
+        Transition from late stance to early swing when the loadcell
+        reads a force less than a threshold (LOAD_ESWING) and
+        the thigh elevation angle is below a threshold (THIGH_ELEVATION_LSTANCE_TO_ESWING).
+        """
+        return bool(fz < LOAD_ESWING and thigh_pitch < THIGH_ELEVATION_LSTANCE_TO_ESWING)
 
     def eswing_to_lswing(knee_pos: float, knee_vel: float) -> bool:
         return bool(
@@ -100,6 +112,11 @@ def create_simple_walking_fsm() -> StateMachine:
         )
 
     def lswing_to_estance(fz: float, knee_pos: float) -> bool:
+        """
+        Transition from late swing to early stance (heel strike) if
+        the loadcell reads a force greater than a threshold (LOAD_ESTANCE) or
+        the knee position is below a threshold (KNEE_THETA_LSWING_TO_ESTANCE).
+        """
         return bool(fz > LOAD_ESTANCE or knee_pos < KNEE_THETA_LSWING_TO_ESTANCE)
 
     fsm = StateMachine(
