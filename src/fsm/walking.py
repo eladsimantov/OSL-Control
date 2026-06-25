@@ -261,7 +261,7 @@ def run_walking_fsm(max_duration: float = None):
                               [0.6546,  0.0638,  0.7533],
                               [0.7385, -0.2671, -0.6191]])
                 mu = np.array([6.4536, -16.3486, 77.4091])
-                shank_cvp = cvp_controller(thigh_elevation, foot_elevation, V, mu) 
+                shank_cvp = cvp_controller(thigh_elevation, foot_elevation + 90, V, mu) 
                 knee_CVP = thigh_elevation - shank_cvp # The simplest 2D transformation in the sagittal plane.
                 knee_effective_eq = osl_fsm.current_state.knee_theta*gamma + knee_CVP * (1-gamma)
 
