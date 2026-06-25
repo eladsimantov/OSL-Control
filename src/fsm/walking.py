@@ -256,7 +256,7 @@ def run_walking_fsm(max_duration: float = None):
                     knee_vel=knee_vel
                 )
 
-                gamma = 0.8 # apply 50% CVP controller versus baseline impedance controller
+                gamma = 0.5 # apply 50% CVP controller versus baseline impedance controller
                 V = np.array([[0.1617,  0.9616, -0.2220],
                               [0.6546,  0.0638,  0.7533],
                               [0.7385, -0.2671, -0.6191]])
