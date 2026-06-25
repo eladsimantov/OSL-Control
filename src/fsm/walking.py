@@ -276,7 +276,7 @@ def run_walking_fsm(max_duration: float = None):
                 if int(t * FREQUENCY) % 20 == 0:
                     print(f"\r t={t:5.2f}s | State: {osl_fsm.current_state.name:11} | Fz: {fz:6.1f}N | "
                           f"Knee Pos: {knee_pos:6.1f}° | Thigh: {thigh_elevation:5.1f}° | Foot: {foot_elevation:5.1f}° | "
-                          f"CVP-Eq distance: {knee_CVP-osl_fsm.current_state.knee_theta:6.1f}° | ", end='', flush=True)
+                          f"CVP-Eq distance: {knee_CVP-knee_pos:6.1f}° | ", end='', flush=True)
 
     except KeyboardInterrupt:
         LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
