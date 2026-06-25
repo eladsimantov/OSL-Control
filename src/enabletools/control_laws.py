@@ -57,6 +57,16 @@ def estimate_T12(xt, xf, V, mu):
     T12 = np.linalg.solve(A, x)
     return T12[0], T12[1]
 
+def ISC_tau_ff(knee_pos, thigh_elevation, foot_elevation, V, mu, k_CVP=0.00):
+    """
+    Compute a feedforward torque term based on the CVP controller and measured thigh angle. 
+    The feedforward torque is computed as an additional stiffness controller at the knee joint. 
+    """
+    shank_cvp = cvp_controller(thigh_elevation, foot_elevation, V, mu) 
+    knee_CVP = thigh_elevation - shank_cvp # The simplest 2D transformation in the sagittal plane.
+    tau_ff = - k_CVP * (knee_pos - knee_CVP)
+    return tau_ff
+
 class BaseController:
     """Base class for modular controllers."""
     def update(self, motor, thigh_imu, foot_imu, loadcell, t: float, state_time: float) -> None:

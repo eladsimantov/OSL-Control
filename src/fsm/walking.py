@@ -15,6 +15,7 @@ from opensourceleg.logging import LOGGER, LogLevel
 from src.drivers.odrive_can import ODriveCAN, ODriveMotor
 from src.adapters.loadcell import SRILoadCell_M8123B2
 from src.adapters.imu import WitMotionIMUAdapter
+from src.enabletools.control_laws import cvp_controller
 
 # Helper for non-blocking console input
 import select
@@ -244,6 +245,7 @@ def run_walking_fsm(max_duration: float = None):
                 foot_elevation = foot_imu.euler_y
                 knee_pos = knee_motor.get_position()
                 knee_vel = knee_motor.get_velocity()
+                
 
                 # Evaluate state transitions via kwargs
                 osl_fsm.update(
@@ -254,17 +256,27 @@ def run_walking_fsm(max_duration: float = None):
                     knee_vel=knee_vel
                 )
 
+                gamma = 0.0
+                V = np.array([[0.1617,  0.9616, -0.2220],
+                              [0.6546,  0.0638,  0.7533],
+                              [0.7385, -0.2671, -0.6191]])
+                mu = np.array([0.1126, -0.2852, 1.3510])
+                shank_cvp = cvp_controller(thigh_elevation, foot_elevation, V, mu) 
+                knee_CVP = thigh_elevation - shank_cvp # The simplest 2D transformation in the sagittal plane.
+                knee_effective_eq = osl_fsm.current_state.knee_theta*gamma + knee_CVP * (1-gamma)
+
                 # Set knee impedance target based on current FSM active state
                 knee_motor.set_impedance(
                     kp=osl_fsm.current_state.knee_stiffness,
                     kd=osl_fsm.current_state.knee_damping,
-                    deg_eq=osl_fsm.current_state.knee_theta
+                    deg_eq=knee_effective_eq
                 )
 
                 # Print telemetry periodically
                 if int(t * FREQUENCY) % 20 == 0:
                     print(f"\r t={t:5.2f}s | State: {osl_fsm.current_state.name:11} | Fz: {fz:6.1f}N | "
-                          f"Knee Pos: {knee_pos:6.1f}° | Thigh: {thigh_elevation:5.1f}° | Foot: {foot_elevation:5.1f}°", end='', flush=True)
+                          f"Knee Pos: {knee_pos:6.1f}° | Thigh: {thigh_elevation:5.1f}° | Foot: {foot_elevation:5.1f}° | "
+                          f"CVP-Eq distance: {knee_CVP-osl_fsm.current_state.knee_theta:6.1f}° | ", end='', flush=True)
 
     except KeyboardInterrupt:
         LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
