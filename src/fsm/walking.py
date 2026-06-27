@@ -17,6 +17,13 @@ from src.adapters.loadcell import SRILoadCell_M8123B2
 from src.adapters.imu import WitMotionIMUAdapter
 from src.enabletools.control_laws import cvp_controller
 
+try:
+    from opensourceleg.control.compiled_controller import CompiledController
+    HAS_PHASE_VAR = True
+except ImportError:
+    HAS_PHASE_VAR = False
+
+
 # Helper for non-blocking console input
 import select
 def get_keypress():
@@ -39,6 +46,9 @@ except Exception as e:
 GEAR_RATIO = config.get("GEAR_RATIO", 41.5)
 FREQUENCY = config.get("FREQUENCY", 100.0)
 BODY_WEIGHT = config.get("BODY_WEIGHT", 245.0)
+WALKING_SPEED = config.get("WALKING_SPEED", 1.0)
+WALKING_INCLINE = config.get("WALKING_INCLINE", 0.0)
+PHASE_VAR_LIB_PATH = config.get("PHASE_VAR_LIB_PATH", None)
 
 # STATE 1: EARLY STANCE
 KNEE_K_ESTANCE = config.get("KNEE_K_ESTANCE", 0.025)
@@ -239,6 +249,43 @@ def run_walking_fsm(max_duration: float = None):
     time.sleep(0.2)  # Allow time for motor to enter closed-loop
     knee_motor.torque_control()
 
+    phase_var = None
+    if HAS_PHASE_VAR:
+        try:
+            if PHASE_VAR_LIB_PATH:
+                lib_path = os.path.abspath(PHASE_VAR_LIB_PATH)
+            else:
+                fsm_dir = os.path.dirname(os.path.abspath(__file__))
+                lib_path = os.path.abspath(os.path.join(fsm_dir, "..", "locolabtools", "phaseVar"))
+            
+            phase_var = CompiledController(
+                library_name="LocolabPhaseVariable",
+                library_path=lib_path,
+                main_function_name="LocolabPhaseVariable",
+                initialization_function_name="LocolabPhaseVariable_initialize",
+                cleanup_function_name="LocolabPhaseVariable_terminate",
+            )
+            phase_var.define_inputs([
+                ("thighAngle_deg", phase_var.types.c_double),
+                ("thighVelocity_dps", phase_var.types.c_double),
+                ("Fz", phase_var.types.c_double),
+                ("time", phase_var.types.c_double),
+                ("incline", phase_var.types.c_double),
+                ("speed", phase_var.types.c_double),
+            ])
+            phase_var.define_outputs([
+                ("phase", phase_var.types.c_double),
+                ("stancePhase", phase_var.types.c_double),
+                ("swingPhase", phase_var.types.c_double),
+                ("state", phase_var.types.c_double),
+            ])
+            phase_var.inputs.speed = WALKING_SPEED
+            phase_var.inputs.incline = WALKING_INCLINE
+            LOGGER.info("LocoLab Phase Variable Controller successfully initialized.")
+        except Exception as e:
+            print(f"\n[Warning] Could not load LocolabPhaseVariable library: {e}. Running walking FSM without phase detection.")
+            phase_var = None
+
     osl_fsm = create_simple_walking_fsm()
 
     clock = SoftRealtimeLoop(dt=1.0 / FREQUENCY, report=True)
@@ -286,11 +333,34 @@ def run_walking_fsm(max_duration: float = None):
                     deg_eq=knee_effective_eq
                 )
 
+                # Evaluate phase variable if available
+                phase_val = 0.0
+                stance_phase_val = 0.0
+                swing_phase_val = 0.0
+                state_val = 0.0
+
+                if phase_var is not None:
+                    try:
+                        phase_var.inputs.thighAngle_deg = thigh_elevation
+                        # Convert rad/s to deg/s for the Locolab algorithm
+                        phase_var.inputs.thighVelocity_dps = math.degrees(thigh_imu.gyro_y)
+                        phase_var.inputs.Fz = fz
+                        phase_var.inputs.time = t
+                        
+                        outputs = phase_var.run()
+                        phase_val = outputs.phase
+                        stance_phase_val = outputs.stancePhase
+                        swing_phase_val = outputs.swingPhase
+                        state_val = outputs.state
+                    except Exception as e:
+                        pass
+
                 # Print telemetry periodically
                 if int(t * FREQUENCY) % 20 == 0:
+                    phase_str = f" | Phase: {phase_val:5.2f} (Stance: {stance_phase_val:5.2f}, Swing: {swing_phase_val:5.2f}, State: {state_val:1.0f})" if phase_var is not None else ""
                     print(f"\r t={t:5.2f}s | State: {osl_fsm.current_state.name:11} | Fz: {fz:6.1f}N | "
                           f"Knee Pos: {knee_pos:6.1f}° | Thigh: {thigh_elevation:5.1f}° | Foot: {foot_elevation:5.1f}° | "
-                          f"CVP-Eq distance: {knee_CVP-knee_pos:6.1f}° | ", end='', flush=True)
+                          f"CVP-Eq distance: {knee_CVP-knee_pos:6.1f}°{phase_str} | ", end='', flush=True)
 
     except KeyboardInterrupt:
         LOGGER.info("KeyboardInterrupt detected. Shutting down cleanly...")
