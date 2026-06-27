@@ -21,8 +21,9 @@ try:
     from opensourceleg.control.compiled_controller import CompiledController
     HAS_PHASE_VAR = True
     print("Compiled controlller library loaded")
-except ImportError:
+except ImportError as e:
     HAS_PHASE_VAR = False
+    print(e)
     print("No compiled controlller library loaded")
 
 
