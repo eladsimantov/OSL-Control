@@ -20,8 +20,10 @@ from src.enabletools.control_laws import cvp_controller
 try:
     from opensourceleg.control.compiled_controller import CompiledController
     HAS_PHASE_VAR = True
+    print("Compiled controlller library loaded")
 except ImportError:
     HAS_PHASE_VAR = False
+    print("No compiled controlller library loaded")
 
 
 # Helper for non-blocking console input
