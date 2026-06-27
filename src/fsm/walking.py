@@ -18,7 +18,7 @@ from src.adapters.imu import WitMotionIMUAdapter
 from src.enabletools.control_laws import cvp_controller
 
 try:
-    from opensourceleg.control.compiled_controller import CompiledController
+    from opensourceleg.control.compiled import CompiledController
     HAS_PHASE_VAR = True
     print("Compiled controlller library loaded")
 except ImportError as e:
