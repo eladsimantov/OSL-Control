@@ -51,7 +51,7 @@ FREQUENCY = config.get("FREQUENCY", 100.0)
 BODY_WEIGHT = config.get("BODY_WEIGHT", 245.0)
 WALKING_SPEED = config.get("WALKING_SPEED", 1.0)
 WALKING_INCLINE = config.get("WALKING_INCLINE", 0.0)
-PHASE_VAR_LIB_PATH = config.get("PHASE_VAR_LIB_PATH", None)
+PHASE_VAR_LIB_PATH = config.get("PHASE_VAR_LIB_PATH", "src/locolabtools/phaseVar/")
 
 # STATE 1: EARLY STANCE
 KNEE_K_ESTANCE = config.get("KNEE_K_ESTANCE", 0.025)
@@ -256,7 +256,11 @@ def run_walking_fsm(max_duration: float = None):
     if HAS_PHASE_VAR:
         try:
             if PHASE_VAR_LIB_PATH:
-                lib_path = os.path.abspath(PHASE_VAR_LIB_PATH)
+                if not os.path.isabs(PHASE_VAR_LIB_PATH):
+                    fsm_dir = os.path.dirname(os.path.abspath(__file__))
+                    lib_path = os.path.abspath(os.path.join(fsm_dir, "..", "..", PHASE_VAR_LIB_PATH))
+                else:
+                    lib_path = os.path.abspath(PHASE_VAR_LIB_PATH)
             else:
                 fsm_dir = os.path.dirname(os.path.abspath(__file__))
                 lib_path = os.path.abspath(os.path.join(fsm_dir, "..", "locolabtools", "phaseVar"))
