@@ -25,38 +25,57 @@ def get_keypress():
         return sys.stdin.readline().strip()
     return None
 
-# ------------- TUNABLE FSM PARAMETERS ---------------- #
-GEAR_RATIO = 41.5
-FREQUENCY = 100.0
-BODY_WEIGHT = 25 * 9.8  # 245.0 N
+import json
+
+# ------------- LOAD CONFIGURATION ---------------- #
+config_path = os.path.join(os.path.dirname(__file__), "config_walking.json")
+try:
+    with open(config_path, "r") as f:
+        config = json.load(f)
+except Exception as e:
+    print(f"Error loading configuration from {config_path}: {e}")
+    sys.exit(1)
+
+GEAR_RATIO = config.get("GEAR_RATIO", 41.5)
+FREQUENCY = config.get("FREQUENCY", 100.0)
+BODY_WEIGHT = config.get("BODY_WEIGHT", 245.0)
 
 # STATE 1: EARLY STANCE
-KNEE_K_ESTANCE = 0.025
-KNEE_B_ESTANCE = 0.0006
-KNEE_THETA_ESTANCE = 0.0
-LOAD_LSTANCE: float = 1.0 * BODY_WEIGHT * 0.25
-THIGH_ELEVATION_ESTANCE_TO_LSTANCE: float = 0.00
+KNEE_K_ESTANCE = config.get("KNEE_K_ESTANCE", 0.025)
+KNEE_B_ESTANCE = config.get("KNEE_B_ESTANCE", 0.0006)
+KNEE_THETA_ESTANCE = config.get("KNEE_THETA_ESTANCE", 0.0)
+LOAD_LSTANCE = config.get("LOAD_LSTANCE", 61.25)
+THIGH_ELEVATION_ESTANCE_TO_LSTANCE = config.get("THIGH_ELEVATION_ESTANCE_TO_LSTANCE", 0.00)
 
 # STATE 2: LATE STANCE
-KNEE_K_LSTANCE = 0.02
-KNEE_B_LSTANCE = 0.00024
-KNEE_THETA_LSTANCE = 8.0
-LOAD_ESWING: float = 1.0 * BODY_WEIGHT * 0.1
-THIGH_ELEVATION_LSTANCE_TO_ESWING: float = 0.00
+KNEE_K_LSTANCE = config.get("KNEE_K_LSTANCE", 0.02)
+KNEE_B_LSTANCE = config.get("KNEE_B_LSTANCE", 0.00024)
+KNEE_THETA_LSTANCE = config.get("KNEE_THETA_LSTANCE", 8.0)
+LOAD_ESWING = config.get("LOAD_ESWING", 24.5)
+THIGH_ELEVATION_LSTANCE_TO_ESWING = config.get("THIGH_ELEVATION_LSTANCE_TO_ESWING", 0.00)
 
 # STATE 3: EARLY SWING
-KNEE_K_ESWING = 0.008
-KNEE_B_ESWING = 0.000012
-KNEE_THETA_ESWING = 60.0
-KNEE_THETA_ESWING_TO_LSWING = 50.0  # degrees at least reached for late swing
-KNEE_DTHETA_ESWING_TO_LSWING = 170.0  # deg/s (~3.0 rad/s)
+KNEE_K_ESWING = config.get("KNEE_K_ESWING", 0.008)
+KNEE_B_ESWING = config.get("KNEE_B_ESWING", 0.000012)
+KNEE_THETA_ESWING = config.get("KNEE_THETA_ESWING", 60.0)
+KNEE_THETA_ESWING_TO_LSWING = config.get("KNEE_THETA_ESWING_TO_LSWING", 50.0)
+KNEE_DTHETA_ESWING_TO_LSWING = config.get("KNEE_DTHETA_ESWING_TO_LSWING", 170.0)
 
 # STATE 4: LATE SWING
-KNEE_K_LSWING = 0.008
-KNEE_B_LSWING = 0.00072
-KNEE_THETA_LSWING = 5.0
-LOAD_ESTANCE: float = 1.0 * BODY_WEIGHT * 0.15
-KNEE_THETA_LSWING_TO_ESTANCE = 30.0  # degrees
+KNEE_K_LSWING = config.get("KNEE_K_LSWING", 0.008)
+KNEE_B_LSWING = config.get("KNEE_B_LSWING", 0.00072)
+KNEE_THETA_LSWING = config.get("KNEE_THETA_LSWING", 5.0)
+LOAD_ESTANCE = config.get("LOAD_ESTANCE", 36.75)
+KNEE_THETA_LSWING_TO_ESTANCE = config.get("KNEE_THETA_LSWING_TO_ESTANCE", 30.0)
+
+# CVP controller parameters
+gamma = config.get("baseline_versus_cvp_gamma", 1.0)
+V = np.array(config.get("cvp_V_matrix", [
+    [0.1617, 0.9616, -0.2220],
+    [0.6546, 0.0638, 0.7533],
+    [0.7385, -0.2671, -0.6191]
+]))
+mu = np.array(config.get("cvp_means_vector", [6.4536, -16.3486, 77.4091]))
 
 # ---------------------------------------------------- #
 
@@ -154,11 +173,11 @@ def create_simple_walking_fsm() -> StateMachine:
 
 def run_walking_fsm(max_duration: float = None):
     # Setup parameters
-    can_interface = "can0"
-    bitrate = 1000000
-    node_id_odrive = 0
-    thigh_imu_mac = "EF:D5:AC:1A:0D:21"
-    foot_imu_mac = "EC:8E:70:CE:63:24"
+    can_interface = config.get("can_interface", "can0")
+    bitrate = config.get("bitrate", 1000000)
+    node_id_odrive = config.get("node_id_odrive", 0)
+    thigh_imu_mac = config.get("thigh_imu_mac", "EF:D5:AC:1A:0D:21")
+    foot_imu_mac = config.get("foot_imu_mac", "EC:8E:70:CE:63:24")
 
     # LOGGER.set_stream_level(LogLevel.DEBUG)
     LOGGER.set_stream_level(LogLevel.ERROR)
@@ -256,11 +275,6 @@ def run_walking_fsm(max_duration: float = None):
                     knee_vel=knee_vel
                 )
 
-                gamma = 0.00 # apply 50% CVP controller versus baseline impedance controller
-                V = np.array([[0.1617,  0.9616, -0.2220],
-                              [0.6546,  0.0638,  0.7533],
-                              [0.7385, -0.2671, -0.6191]])
-                mu = np.array([6.4536, -16.3486, 77.4091])
                 shank_cvp = cvp_controller(thigh_elevation, foot_elevation + 90, V, mu) 
                 knee_CVP = thigh_elevation - shank_cvp # The simplest 2D transformation in the sagittal plane.
                 knee_effective_eq = osl_fsm.current_state.knee_theta*gamma + knee_CVP * (1-gamma)

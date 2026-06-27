@@ -1,0 +1,53 @@
+{
+    "GEAR_RATIO": 41.5,
+    "FREQUENCY": 100.0,
+    "BODY_WEIGHT": 245.0,
+    "can_interface": "can0",
+    "bitrate": 1000000,
+    "node_id_odrive": 0,
+    "thigh_imu_mac": "EF:D5:AC:1A:0D:21",
+    "foot_imu_mac": "EC:8E:70:CE:63:24",
+    "baseline_versus_cvp_gamma": 1.0,
+    "cvp_V_matrix": [
+        [
+            0.1617,
+            0.9616,
+            -0.2220
+        ],
+        [
+            0.6546,
+            0.0638,
+            0.7533
+        ],
+        [
+            0.7385,
+            -0.2671,
+            -0.6191
+        ]
+    ],
+    "cvp_means_vector": [
+        6.4536,
+        -16.3486,
+        77.4091
+    ],
+    "KNEE_K_ESTANCE": 0.025,
+    "KNEE_B_ESTANCE": 0.0006,
+    "KNEE_THETA_ESTANCE": 0.0,
+    "LOAD_LSTANCE": 61.25,
+    "THIGH_ELEVATION_ESTANCE_TO_LSTANCE": 0.0,
+    "KNEE_K_LSTANCE": 0.02,
+    "KNEE_B_LSTANCE": 0.00024,
+    "KNEE_THETA_LSTANCE": 8.0,
+    "LOAD_ESWING": 24.5,
+    "THIGH_ELEVATION_LSTANCE_TO_ESWING": 0.0,
+    "KNEE_K_ESWING": 0.008,
+    "KNEE_B_ESWING": 0.000012,
+    "KNEE_THETA_ESWING": 60.0,
+    "KNEE_THETA_ESWING_TO_LSWING": 50.0,
+    "KNEE_DTHETA_ESWING_TO_LSWING": 170.0,
+    "KNEE_K_LSWING": 0.008,
+    "KNEE_B_LSWING": 0.00072,
+    "KNEE_THETA_LSWING": 5.0,
+    "LOAD_ESTANCE": 36.75,
+    "KNEE_THETA_LSWING_TO_ESTANCE": 30.0
+}
