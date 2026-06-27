@@ -1,12 +1,4 @@
 {
-    "GEAR_RATIO": 41.5,
-    "FREQUENCY": 100.0,
-    "BODY_WEIGHT": 245.0,
-    "can_interface": "can0",
-    "bitrate": 1000000,
-    "node_id_odrive": 0,
-    "thigh_imu_mac": "EF:D5:AC:1A:0D:21",
-    "foot_imu_mac": "EC:8E:70:CE:63:24",
     "baseline_versus_cvp_gamma": 1.0,
     "cvp_V_matrix": [
         [
