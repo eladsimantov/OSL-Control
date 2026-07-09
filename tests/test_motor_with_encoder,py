@@ -1,0 +1,155 @@
+"""
+Author: Sarit Nagel
+Date: 08/07/2026
+
+“This script synchronizes an ODrive motor controller with an external 
+AS5048A absolute encoder to monitor the ankle’s angular position during 
+rotation. While the ODrive manages motor commutation internally, 
+the Raspberry Pi simultaneously reads the ‘Ankle Angle’ from the 
+AS5048A via SPI. The script executes a controlled trapezoidal trajectory 
+move and logs real-time motor position, external joint angle, and motor 
+torque data for analysis.”
+
+Pin Cpnnections: (AS5048A to Raspberry Pi)
+- GND -> Pin 6 (GND)
+- VDD5V -> Pin 1 (3.3V)
+- MISO -> Pin 35 (SPI0 MISO)
+- MOSI -> Pin 38 (SPI0 MOSI)
+- CLK -> Pin 40 (SPI0 SCLK)
+- CSn -> Pin 36 (GPIO16)
+"""
+import odrive
+from odrive.enums import *
+import time
+import math
+import spidev
+
+# --- SPI Setup for AS5048A (Raspberry Pi Pins) ---
+spi = spidev.SpiDev()
+spi.open(1, 2) # Bus 1, Device 2 
+spi.max_speed_hz = 100000 
+spi.mode = 1
+
+def get_external_angle(): 
+    """
+    Reads the absolute angular position from the AS5048A encoder 
+    connected to the Raspberry Pi SPI pins. Returns the value in degrees.
+    """    # Send request for angle (0xFFFF)
+    spi.xfer2([0xFF, 0xFF])
+    time.sleep(0.0001)
+    # Read the result
+    resp = spi.xfer2([0xFF, 0xFF])
+    # Combine bytes and remove flags (bits 14 and 15)
+    raw_val = ((resp[0] & 0x3F) << 8) | resp[1]
+    # Convert to degrees (14-bit resolution)
+    degrees = (raw_val * 360.0) / 16384.0
+    return degrees
+
+def run_odrive_with_external_encoder():
+    """
+    Configures the ODrive for position control, performs a calibration 
+    sequence, and executes a trajectory move while simultaneously 
+    polling the external AS5048A encoder for high-accuracy angle data.
+    """
+    # --- ODrive Configuration ---
+    TORQUE_CONSTANT = 0.0827
+
+    print("Searching for ODrive...")
+    my_drive = odrive.find_any()
+    print("Connected!")
+
+    # 1. Clear Errors
+    my_drive.axis0.requested_state = AxisState.IDLE
+    my_drive.clear_errors()
+    time.sleep(0.5)
+
+    # 2. Hardware Parameters
+    print("Applying hardware parameters...")
+    my_drive.axis0.config.motor.pole_pairs = 21
+    my_drive.axis0.config.motor.torque_constant = TORQUE_CONSTANT
+
+    # Note: Since the encoder is on the Pi, ODrive uses its internal 
+    # estimation for commutation, but we track the 'Ankle Angle' via the Pi.
+    my_drive.axis0.config.motor.current_soft_max = 10
+    my_drive.axis0.config.motor.current_hard_max = 23
+
+    # 3. Control Mode (Trapezoidal Trajectory)
+    my_drive.axis0.controller.config.control_mode = ControlMode.POSITION_CONTROL
+    my_drive.axis0.controller.config.input_mode = InputMode.TRAP_TRAJ
+
+    # Gains
+    my_drive.axis0.controller.config.pos_gain = 100.0 
+    my_drive.axis0.controller.config.vel_gain = 0.1
+    my_drive.axis0.controller.config.vel_integrator_gain = 0.3
+
+    # Path Smoothness
+    my_drive.axis0.trap_traj.config.vel_limit = 1.0     
+    my_drive.axis0.trap_traj.config.accel_limit = 0.5   
+    my_drive.axis0.trap_traj.config.decel_limit = 0.5
+
+    # 4. Calibration
+    print("Starting Calibration (Motor should move)...")
+    my_drive.axis0.requested_state = AxisState.FULL_CALIBRATION_SEQUENCE
+    while my_drive.axis0.current_state != AxisState.IDLE:
+        time.sleep(0.1)
+    print("Calibration Complete.")
+
+    # 5. Engage
+    print("Engaging CLOSED_LOOP_CONTROL...")
+    my_drive.axis0.requested_state = AxisState.CLOSED_LOOP_CONTROL
+    time.sleep(0.5)
+
+    # 6. Execute Move and Print Live Data
+    if my_drive.axis0.current_state == AxisState.CLOSED_LOOP_CONTROL:
+        start_pos = my_drive.axis0.pos_estimate
+        # Move the mtor by 2 turns
+        if start_pos > 1.0:
+            target = start_pos - 2.0
+        else:
+            target = start_pos + 2.0
+        print(f"Moving from {start_pos:.3f} to {target:.3f}")
+
+        print("-" * 85)
+        # Added 'Ankle (Deg)' column which comes from the AS5048A
+        print(f"{'Time (s)':<10} | {'Position (Turns)':<15} | {'Angle (Deg)':<15} | {'Torque (Nm)':<15}")
+        print("-" * 85)
+        
+        my_drive.axis0.controller.input_pos = target
+        start_time = time.time()
+        
+        try:
+            for _ in range(150): 
+                # 1. Get position from ODrive
+                motor_pos = my_drive.axis0.pos_estimate
+                
+                # 2. Get real-time angle from the AS5048A (External)
+                ankle_angle = get_external_angle()
+                
+                # 3. Get torque
+                measured_iq = my_drive.axis0.motor.foc.Iq_measured 
+                calc_torque = measured_iq * TORQUE_CONSTANT
+                elapsed = time.time() - start_time
+                
+                # Display everything
+                print(f"{elapsed:<10.2f} | {motor_pos:<15.3f} | {ankle_angle:<15.2f} | {calc_torque:<15.4f}")
+                
+                if abs(motor_pos - target) < 0.05:
+                    print("-" * 85)
+                    print("Target reached!")
+                    break
+                    
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\nInterrupted by user.")
+
+    # 7. Disengage
+    print("Disengaging motor.")
+    my_drive.axis0.requested_state = AxisState.IDLE
+    spi.close()
+    print("Done.")
+    
+if __name__ == "__main__":
+    """
+    Main entry point to begin the ODrive and AS5048A testing sequence.
+    """
+    run_odrive_with_external_encoder()
