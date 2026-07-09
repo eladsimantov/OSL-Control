@@ -1,6 +1,6 @@
 """
 Author: Sarit Nagel
-Date: 08/07/2026
+Date: 09/07/2026
 
 “This script synchronizes an ODrive motor controller with an external 
 AS5048A absolute encoder to monitor the ankle’s angular position during 
