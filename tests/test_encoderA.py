@@ -1,6 +1,6 @@
 """
 Author: Sarit Nagel
-Date: 08/07/2026
+Date: 09/07/2026
 
 This script is used to interface with an AS5048A absolute rotary encoder 
 using SPI communication on a Raspberry Pi. 
