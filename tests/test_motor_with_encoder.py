@@ -109,8 +109,8 @@ def run_odrive_with_external_encoder():
             target = start_pos + 2.0
         print(f"Moving from {start_pos:.3f} to {target:.3f}")
 
+        # Print output header
         print("-" * 85)
-        # Added 'Ankle (Deg)' column which comes from the AS5048A
         print(f"{'Time (s)':<10} | {'Position (Turns)':<15} | {'Angle (Deg)':<15} | {'Torque (Nm)':<15}")
         print("-" * 85)
         
@@ -130,7 +130,7 @@ def run_odrive_with_external_encoder():
                 calc_torque = measured_iq * TORQUE_CONSTANT
                 elapsed = time.time() - start_time
                 
-                # Display everything
+                # Display values
                 print(f"{elapsed:<10.2f} | {motor_pos:<15.3f} | {ankle_angle:<15.2f} | {calc_torque:<15.4f}")
                 
                 if abs(motor_pos - target) < 0.05:

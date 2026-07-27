@@ -20,7 +20,6 @@ import time
 
 # Initialize SPI
 spi = spidev.SpiDev()
-# Use (1, 2) which matches your CSN Pin 36 setup
 spi.open(1, 2) 
 spi.max_speed_hz = 100000 
 spi.mode = 1
@@ -31,7 +30,7 @@ def get_angle():
     angle value. It sends a read request for the angle register (0x3FFF) 
     and processes the parity and error bits.
     """
-    # Step 1: Send request for angle (Register 0x3FFF)
+    # Step 1: Send request for angle (Register 0ex3FFF)
     # The AS5048A requires the Parity bit to be 1 for a read command, 
     # so 0x3FFF becomes 0xFFFF.
     spi.xfer2([0xFF, 0xFF])
