@@ -24,7 +24,7 @@ import math
 import spidev
 
 # --- Impedance Configuration ---
-G = -41.667                   # Gear Ratio (Ankle to Motor)
+G = -37.5                   # Gear Ratio (Ankle to Motor)
 K_SPRING = 51.3127 * 2        # Physical stiffness of the 2 torsion springs (Nm/rad)
 
 # --- GAIT & COMPLIANCE CONFIGURATION ---
