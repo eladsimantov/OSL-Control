@@ -44,6 +44,8 @@ HELPER_NAME = "pv_helper"
 HELPER_SRC = "pv_helper.c"
 ARMHF_ROOT = "/usr/arm-linux-gnueabihf"
 ARMHF_LOADER = os.path.join(ARMHF_ROOT, "lib", "ld-linux-armhf.so.3")
+# 64K segment alignment so the helper also loads on 16K-page kernels (Pi 5 default)
+PAGE_FLAGS = ["-Wl,-z,max-page-size=0x10000", "-Wl,-z,common-page-size=0x10000"]
 
 
 class Inputs(ctypes.Structure):
@@ -97,7 +99,7 @@ class _HelperBackend:
         _ensure_helper(lib_dir, helper)
         lib_path = f"{lib_dir}:{os.path.join(ARMHF_ROOT, 'lib')}"
         candidates = [
-            ("armhf helper (native, multiarch)", [helper]),
+            ("armhf helper (native, multiarch - optional, needs libc6:armhf)", [helper]),
             ("armhf helper (native, cross loader)", [ARMHF_LOADER, "--library-path", lib_path, helper]),
             ("armhf helper (qemu-arm emulation)", [shutil.which("qemu-arm") or "qemu-arm", "-L", ARMHF_ROOT, helper]),
         ]
@@ -126,11 +128,16 @@ class _HelperBackend:
                 except Exception:
                     pass
                 errors.append(f"  - {name}: {err or e}")
-        raise RuntimeError(
-            "Could not start the 32-bit phase-variable helper:\n" + "\n".join(errors) +
-            "\n\nOn 64-bit Pi OS run once:\n"
-            "  sudo apt install libc6-armhf-cross libstdc++6-armhf-cross libgomp1-armhf-cross qemu-user"
-        )
+        hint = ("\n\nOn 64-bit Pi OS run once:\n"
+                "  sudo apt install libc6-armhf-cross libstdc++6-armhf-cross libgomp1-armhf-cross qemu-user")
+        page = os.sysconf("SC_PAGE_SIZE")
+        if page > 4096 or any("page-aligned" in e or "map segment" in e for e in errors):
+            hint += (f"\n\nThis kernel uses {page // 1024} KB memory pages (Pi 5 default kernel_2712).\n"
+                     "Some 32-bit libraries are only 4 KB aligned and cannot be loaded on it, and\n"
+                     "qemu-user cannot emulate them either. Fix: switch to the 4 KB-page kernel:\n"
+                     "  echo 'kernel=kernel8.img' | sudo tee -a /boot/firmware/config.txt && sudo reboot\n"
+                     "  (check afterwards: getconf PAGESIZE  -> 4096)")
+        raise RuntimeError("Could not start the 32-bit phase-variable helper:\n" + "\n".join(errors) + hint)
 
     def _read_exact(self, n, timeout):
         buf = b""
@@ -178,10 +185,10 @@ def _ensure_helper(lib_dir, helper):
         if not (cc and os.path.isfile(src)):
             raise FileNotFoundError(
                 f"{helper} missing. Build it with:\n  cd {lib_dir} && arm-linux-gnueabihf-gcc -O2 -o pv_helper "
-                f"pv_helper.c -L. -l:{LIB_NAME} -Wl,-rpath,'$ORIGIN'\n"
+                f"pv_helper.c -L. -l:{LIB_NAME} -Wl,-rpath,'$ORIGIN' {' '.join(PAGE_FLAGS)}\n"
                 "(sudo apt install gcc-arm-linux-gnueabihf)")
         subprocess.run([cc, "-O2", "-o", helper, src, "-L", lib_dir, f"-l:{LIB_NAME}",
-                        "-Wl,-rpath,$ORIGIN"], check=True)
+                        "-Wl,-rpath,$ORIGIN", *PAGE_FLAGS], check=True)
     mode = os.stat(helper).st_mode
     if not mode & stat.S_IXUSR:
         try:

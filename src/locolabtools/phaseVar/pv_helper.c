@@ -14,7 +14,8 @@
  *
  * Build (on the Pi or any Linux PC):
  *   arm-linux-gnueabihf-gcc -O2 -o pv_helper pv_helper.c -L. -l:LocolabPhaseVariable.so \
- *       -Wl,-rpath,'$ORIGIN'
+ *       -Wl,-rpath,'$ORIGIN' -Wl,-z,max-page-size=0x10000 -Wl,-z,common-page-size=0x10000
+ *   (the 64K alignment is required on 16K-page kernels, e.g. the Pi 5 default kernel)
  */
 #include <unistd.h>
 
