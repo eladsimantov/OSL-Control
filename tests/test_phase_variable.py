@@ -37,7 +37,6 @@ Author: generated for the eNaBLe lab OSL-Control repo
 
 import argparse
 import csv
-import ctypes
 import json
 import math
 import os
@@ -73,76 +72,9 @@ LOG_FIELDS = [
 
 
 # =============================================================================
-# Library wrapper
+# Library wrapper - works on 32-bit Pi OS (ctypes) and 64-bit Pi OS (32-bit helper process)
 # =============================================================================
-class _Inputs(ctypes.Structure):
-    _fields_ = [
-        ("thighAngle_deg", ctypes.c_double),
-        ("thighVelocity_dps", ctypes.c_double),
-        ("Fz", ctypes.c_double),
-        ("time", ctypes.c_double),
-        ("incline", ctypes.c_double),
-        ("speed", ctypes.c_double),
-    ]
-
-
-class _Outputs(ctypes.Structure):
-    _fields_ = [
-        ("phase", ctypes.c_double),
-        ("stancePhase", ctypes.c_double),
-        ("swingPhase", ctypes.c_double),
-        ("state", ctypes.c_double),
-    ]
-
-
-class PhaseVariable:
-    """Thin ctypes wrapper - identical calling convention to opensourceleg's CompiledController
-    (main(&inputs, &outputs)), but with a reset() so replays start from a clean state."""
-
-    def __init__(self, lib_dir: str = DEFAULT_LIB_DIR, speed: float = 1.0, incline: float = 0.0):
-        so_path = os.path.join(lib_dir, "LocolabPhaseVariable.so")
-        if not os.path.isfile(so_path):
-            raise FileNotFoundError(f"Library not found: {so_path}")
-        try:
-            self.lib = ctypes.CDLL(so_path)
-        except OSError as e:
-            raise OSError(
-                f"{e}\n\n  LocolabPhaseVariable.so is a 32-bit ARM (armhf) library.\n"
-                f"  This Python is {platform.machine()} / {struct.calcsize('P') * 8}-bit.\n"
-                f"  It only loads from a 32-bit ARM Python (e.g. 32-bit Raspberry Pi OS).\n"
-                f"  On 64-bit Pi OS (aarch64) or on a PC it will NOT load - that also means\n"
-                f"  walking.py silently runs without the phase variable."
-            ) from e
-        self._main = self.lib.LocolabPhaseVariable
-        self._main.argtypes = [ctypes.POINTER(_Inputs), ctypes.POINTER(_Outputs)]
-        self._main.restype = None
-        self.inputs = _Inputs()
-        self.outputs = _Outputs()
-        self.inputs.speed = speed
-        self.inputs.incline = incline
-        self._initialized = False
-        self.reset()
-
-    def reset(self):
-        """The .so keeps its filter/FSM state in globals -> terminate + initialize to start fresh."""
-        if self._initialized:
-            self.lib.LocolabPhaseVariable_terminate()
-        self.lib.LocolabPhaseVariable_initialize()
-        self._initialized = True
-
-    def step(self, thigh_deg, thigh_vel_dps, fz, t):
-        self.inputs.thighAngle_deg = thigh_deg
-        self.inputs.thighVelocity_dps = thigh_vel_dps
-        self.inputs.Fz = fz
-        self.inputs.time = t
-        self._main(ctypes.byref(self.inputs), ctypes.byref(self.outputs))
-        o = self.outputs
-        return o.phase, o.stancePhase, o.swingPhase, o.state
-
-    def close(self):
-        if self._initialized:
-            self.lib.LocolabPhaseVariable_terminate()
-            self._initialized = False
+from src.locolabtools.phaseVar.phase_variable import PhaseVariable  # noqa: E402
 
 
 # =============================================================================
@@ -294,7 +226,19 @@ def run_selftest(args):
     print(f"  Python   : {sys.version.split()[0]}  {platform.machine()}  {struct.calcsize('P') * 8}-bit")
     print(f"  Lib dir  : {args.lib_path}")
     pv = PhaseVariable(args.lib_path, args.speed, args.incline)
-    print("  [OK] LocolabPhaseVariable.so loaded and initialized.")
+    print(f"  [OK] LocolabPhaseVariable loaded via: {pv.backend}")
+    n = 2000
+    t0 = time.perf_counter()
+    worst = 0.0
+    for k in range(n):
+        s0 = time.perf_counter()
+        pv.step(10.0, 0.0, -100.0, k * 0.01)
+        worst = max(worst, time.perf_counter() - s0)
+    mean_us = (time.perf_counter() - t0) / n * 1e6
+    budget_us = 1e6 / args.freq
+    print(f"  Call latency: mean {mean_us:.0f} us, worst {worst * 1e6:.0f} us "
+          f"(loop budget at {args.freq:.0f} Hz = {budget_us:.0f} us) "
+          + ("[OK]" if worst * 1e6 < 0.3 * budget_us else "[WARN] large share of the loop budget"))
 
     t, ph_true, th, dth, fz_sensor = synthetic_gait(fs=args.freq)
 
